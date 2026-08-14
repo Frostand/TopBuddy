@@ -31,20 +31,30 @@ final class CalendarAgendaStore: ObservableObject {
     }
 
     func requestAccess() async {
-        do {
-            if authorizationStatus != .fullAccess {
-                _ = try await eventStore.requestFullAccessToEvents()
+        if authorizationStatus != .fullAccess {
+            let result = await withCheckedContinuation { continuation in
+                eventStore.requestFullAccessToEvents { granted, error in
+                    continuation.resume(
+                        returning: CalendarAccessResult(
+                            granted: granted,
+                            errorMessage: error?.localizedDescription
+                        )
+                    )
+                }
             }
-            authorizationStatus = EKEventStore.authorizationStatus(for: .event)
-            isEnabled = authorizationStatus == .fullAccess
-            defaults.set(isEnabled, forKey: Self.enabledKey)
-            if canRead { refresh() }
-        } catch {
-            authorizationStatus = EKEventStore.authorizationStatus(for: .event)
-            isEnabled = false
-            defaults.set(false, forKey: Self.enabledKey)
-            errorMessage = error.localizedDescription
+            if let errorMessage = result.errorMessage {
+                authorizationStatus = EKEventStore.authorizationStatus(for: .event)
+                isEnabled = false
+                defaults.set(false, forKey: Self.enabledKey)
+                self.errorMessage = errorMessage
+                return
+            }
         }
+
+        authorizationStatus = EKEventStore.authorizationStatus(for: .event)
+        isEnabled = authorizationStatus == .fullAccess
+        defaults.set(isEnabled, forKey: Self.enabledKey)
+        if canRead { refresh() }
     }
 
     func disable() {
@@ -77,4 +87,9 @@ final class CalendarAgendaStore: ObservableObject {
             }
         errorMessage = nil
     }
+}
+
+private struct CalendarAccessResult: Sendable {
+    let granted: Bool
+    let errorMessage: String?
 }
