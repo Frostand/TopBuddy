@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Privacy audit
+        run: ./script/privacy_audit.sh
+      - name: Tests with warnings as errors
+        run: swift test -Xswiftc -warnings-as-errors
+      - name: Release build
+        run: swift build -c release
