@@ -10,7 +10,7 @@ The public build starts empty: no schedule, account, workspace link, pet downloa
 - First-run setup with Observe, Assist, and Focus control presets plus individual switches.
 - Four-column Markdown/TSV schedule import and private `today.json` handoff.
 - Per-block HTTPS, localhost, installed-app, book, file, and physical-material focus kits.
-- Optional Lock In mode with a constrained browser, app hiding, and short reason-gated exceptions.
+- Optional Lock In mode with external default-browser controls, app hiding, and short reason-gated exceptions.
 - Local completion state and explicit downstream rollover when a block needs more time.
 - Optional Notion WebKit workspace, read-only Apple Calendar agenda, and Apple Music playback controls.
 - Optional user-initiated Codex coaching through an installed CLI in an ephemeral read-only sandbox.
@@ -28,7 +28,7 @@ Apple Music, Calendar, Notion, and Codex are separate opt-ins. Automatic focus c
 
 ## Lock In mode
 
-Lock In turns the current block's focus kit into an allowlist. Approved apps remain available, approved websites open inside TopBuddy's constrained browser, and unlisted regular apps are hidden when they come to the front. A blocked app or website can receive a 5, 10, 15, or 30 minute exception only after the user writes a task-specific reason.
+Lock In turns the current block's focus kit into an allowlist. Approved apps remain available, approved websites open in the Mac's current default browser, and unlisted regular apps are hidden when they come to the front. TopBuddy checks links it opens but cannot inspect or block manual navigation in the external browser without an extension. A blocked app or website can receive a 5, 10, 15, or 30 minute exception only after the user writes a task-specific reason.
 
 Lock In is a focus aid, not parental-control or security software. It does not force-quit apps, modify firewall rules, install a system extension, or make the Mac impossible to override. **End Lock In** is always available. Exception reasons and grants stay in memory and are cleared when Lock In ends or the schedule moves to a different block.
 

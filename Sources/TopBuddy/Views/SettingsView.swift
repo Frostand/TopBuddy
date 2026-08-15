@@ -26,7 +26,7 @@ struct SettingsView: View {
                 Toggle("Automatically open block resources", isOn: $model.autoOpenResources)
                 Toggle("Hide unrelated apps at block changes", isOn: $model.autoHideDistractions)
                 Toggle("Lock In mode", isOn: lockInBinding)
-                Text("Lock In uses each block's exact focus kit, opens approved sites inside a constrained browser, and hides off-topic apps. It never force-quits apps and always provides an immediate exit.")
+                Text("Lock In uses each block's exact focus kit, opens approved sites in your macOS default browser, and hides off-topic apps. TopBuddy cannot inspect or block manual navigation there without an extension. It never force-quits apps and always provides an immediate exit.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Toggle("Show manual app-quit review tools", isOn: $model.quitReviewEnabled)

@@ -104,7 +104,8 @@ final class AppModel: ObservableObject {
         let defaults = UserDefaults.standard
         let lockInStore = lockIn ?? LockInStore()
         self.schedule = schedule ?? ScheduleStore()
-        self.workspace = workspace ?? WorkspaceController()
+        let workspaceController = workspace ?? WorkspaceController()
+        self.workspace = workspaceController
         self.codex = codex
         self.speech = speech
         self.petLibrary = petLibrary ?? PetLibraryStore()
@@ -113,7 +114,10 @@ final class AppModel: ObservableObject {
         self.focusUtility = focusUtility ?? FocusUtilityStore()
         self.calendarAgenda = calendarAgenda ?? CalendarAgendaStore()
         self.lockIn = lockInStore
-        self.focusBrowser = FocusBrowserStore(lockIn: lockInStore)
+        self.focusBrowser = FocusBrowserStore(
+            lockIn: lockInStore,
+            defaultBrowserRouter: workspaceController.defaultBrowserRouter
+        )
         self.onboardingComplete = defaults.bool(forKey: Self.onboardingKey)
         self.autoOpenResources = defaults.bool(forKey: Self.autoOpenKey)
         self.autoHideDistractions = defaults.bool(forKey: Self.autoHideKey)
@@ -201,7 +205,7 @@ final class AppModel: ObservableObject {
                 statusMessage = "Lock In can protect only the block happening now."
                 return
             }
-            prepareLockIn(for: block, showWindow: true)
+            prepareLockIn(for: block, showWindow: false)
             return
         }
         workspace.prepare(block: block, hideDistractions: autoHideDistractions)
@@ -214,13 +218,32 @@ final class AppModel: ObservableObject {
                 statusMessage = "That resource belongs to a different block and remains blocked."
                 return
             }
-            if lockIn.activePolicy?.blockID != block.id {
-                focusBrowser.configure(for: block)
+            let expectedPolicy = LockInPolicy(
+                block: block,
+                additionalAllowedBundleIdentifiers: workspace.allowedBundleIdentifiers(for: block)
+            )
+            if lockIn.activePolicy != expectedPolicy {
+                lockIn.configure(
+                    for: block,
+                    additionalAllowedBundleIdentifiers: expectedPolicy.allowedBundleIdentifiers
+                )
+                focusBrowser.configure(for: block, preserveLockInPolicy: true)
             }
             switch resource.kind {
             case .url:
-                focusBrowser.requestLoad(resource)
-                showLockInWindow()
+                guard resource.isSafeToOpen,
+                      let url = URL(string: resource.value) else {
+                    statusMessage = "That link is not a safe HTTPS or localhost resource."
+                    return
+                }
+                guard lockIn.allows(url: url) else {
+                    lockIn.registerBlockedWebsite(url: url)
+                    statusMessage = "That website is outside this block's Lock In focus kit."
+                    showLockInWindow()
+                    return
+                }
+                workspace.open([resource])
+                statusMessage = "Opened \(resource.label) in \(workspace.currentDefaultBrowser.name)."
             case .application:
                 guard lockIn.allowedBundleIdentifiers().contains(resource.value) else {
                     statusMessage = "That app is not in this block's Lock In focus kit."
@@ -248,7 +271,7 @@ final class AppModel: ObservableObject {
                 statusMessage = "Lock In is on and waiting for the next schedule block."
                 return
             }
-            prepareLockIn(for: candidate, showWindow: true)
+            prepareLockIn(for: candidate, showWindow: false)
         }
     }
 
@@ -273,11 +296,7 @@ final class AppModel: ObservableObject {
     }
 
     func hideDistractions(for block: ScheduleBlock?) {
-        let required = Set(
-            block?.resources
-                .filter { $0.kind == .application }
-                .map(\.value) ?? []
-        )
+        let required = block.map { workspace.allowedBundleIdentifiers(for: $0) } ?? []
         workspace.hideUnrelatedApps(keeping: required)
         statusMessage = workspace.lastActionSummary
     }
@@ -432,7 +451,7 @@ final class AppModel: ObservableObject {
         lastObservedBlockKey = key
         statusMessage = "Now: \(block.title)"
         if allowAutomation && lockInModeEnabled {
-            prepareLockIn(for: block, showWindow: true)
+            prepareLockIn(for: block, showWindow: false)
         } else if allowAutomation && autoOpenResources {
             workspace.prepare(block: block, hideDistractions: autoHideDistractions)
             statusMessage = "TopBuddy prepared \(block.title). \(workspace.lastActionSummary)"
@@ -464,18 +483,22 @@ final class AppModel: ObservableObject {
     }
 
     private func prepareLockIn(for block: ScheduleBlock, showWindow: Bool) {
-        focusBrowser.configure(for: block)
+        let allowedBundleIdentifiers = workspace.allowedBundleIdentifiers(for: block)
+        lockIn.configure(
+            for: block,
+            additionalAllowedBundleIdentifiers: allowedBundleIdentifiers
+        )
+        focusBrowser.configure(for: block, preserveLockInPolicy: true)
         workspace.prepare(
             block: block,
             hideDistractions: true,
-            openURLsExternally: false,
             strictAllowlist: true
         )
         startLockInMonitoring()
-        if showWindow || block.resources.contains(where: { $0.kind == .url && $0.openAtStart }) {
+        if showWindow {
             showLockInWindow()
         }
-        statusMessage = "Locked in to \(block.title). Only its focus kit is allowed; nothing was quit."
+        statusMessage = "Locked in to \(block.title). Approved links open in \(workspace.currentDefaultBrowser.name); nothing was quit."
     }
 
     private func startLockInMonitoring() {
@@ -501,11 +524,14 @@ final class AppModel: ObservableObject {
             suspendLockInIfNeeded()
             return
         }
-        if lockIn.activePolicy != LockInPolicy(block: block) {
-            prepareLockIn(for: block, showWindow: true)
+        let expectedPolicy = LockInPolicy(
+            block: block,
+            additionalAllowedBundleIdentifiers: workspace.allowedBundleIdentifiers(for: block)
+        )
+        if lockIn.activePolicy != expectedPolicy {
+            prepareLockIn(for: block, showWindow: false)
         }
         let allowed = lockIn.allowedBundleIdentifiers()
-        focusBrowser.enforceCurrentAccess()
         guard let blocked = workspace.blockFrontmostApplication(keeping: allowed) else { return }
         if lockIn.registerBlockedApplication(
             name: blocked.name,
@@ -523,7 +549,9 @@ final class AppModel: ObservableObject {
                 .application(attempt.label, bundleIdentifier: attempt.value)
             ])
         case .website:
-            focusBrowser.resumeAfterGrant(attempt)
+            let resource = ResourceTarget.url(attempt.label, attempt.value)
+            guard resource.isSafeToOpen else { return }
+            workspace.open([resource])
         }
     }
 

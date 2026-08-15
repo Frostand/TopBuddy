@@ -248,7 +248,7 @@ struct DashboardView: View {
                 Toggle("Auto-open resources", isOn: $model.autoOpenResources)
                 Toggle("Auto-hide distractions", isOn: $model.autoHideDistractions)
 
-                Button(model.lockInModeEnabled ? "Show Lock In browser" : "Start Lock In") {
+                Button(model.lockInModeEnabled ? "Show Lock In controls" : "Start Lock In") {
                     if model.lockInModeEnabled {
                         model.showLockInWindow()
                     } else {

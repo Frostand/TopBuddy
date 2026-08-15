@@ -95,6 +95,106 @@ final class TopBuddyTests: XCTestCase {
         XCTAssertFalse(ResourceTarget.application("Bad", bundleIdentifier: "com..Editor").isSafeToOpen)
     }
 
+    @MainActor
+    func testApprovedURLResourcesUseInjectedDefaultBrowserRouter() throws {
+        let router = TestDefaultBrowserRouter(
+            identity: DefaultBrowserIdentity(name: "Aside", bundleIdentifier: "at.studio.asidebrowser")
+        )
+        let workspace = WorkspaceController(defaultBrowserRouter: router)
+        let resource = ResourceTarget.url("Guide", "https://example.com/guide")
+
+        workspace.open([resource])
+
+        XCTAssertEqual(router.openedURLs, [try XCTUnwrap(URL(string: resource.value))])
+    }
+
+    @MainActor
+    func testURLResourceAddsCurrentDefaultBrowserToLockInApplicationAllowlist() {
+        let router = TestDefaultBrowserRouter(
+            identity: DefaultBrowserIdentity(name: "Aside", bundleIdentifier: "at.studio.asidebrowser")
+        )
+        let workspace = WorkspaceController(defaultBrowserRouter: router)
+        let block = ScheduleBlock(
+            id: "focus",
+            title: "Focused work",
+            startMinute: 600,
+            endMinute: 660,
+            category: .competition,
+            exactActions: "Use the assigned guide.",
+            finishTarget: "One saved artifact.",
+            resources: [.url("Guide", "https://example.com/guide")],
+            competition: Competition(rawValue: "Example")
+        )
+
+        XCTAssertEqual(
+            workspace.allowedBundleIdentifiers(for: block),
+            ["at.studio.asidebrowser"]
+        )
+    }
+
+    @MainActor
+    func testLockInControlsOpenApprovedURLInInjectedDefaultBrowser() throws {
+        let router = TestDefaultBrowserRouter(
+            identity: DefaultBrowserIdentity(name: "Aside", bundleIdentifier: "at.studio.asidebrowser")
+        )
+        let lockIn = LockInStore()
+        let block = ScheduleBlock(
+            id: "focus",
+            title: "Focused work",
+            startMinute: 600,
+            endMinute: 660,
+            category: .competition,
+            exactActions: "Use the assigned guide.",
+            finishTarget: "One saved artifact.",
+            resources: [.url("Guide", "https://example.com/guide")],
+            competition: Competition(rawValue: "Example")
+        )
+        lockIn.configure(for: block)
+        let controls = FocusBrowserStore(lockIn: lockIn, defaultBrowserRouter: router)
+        controls.configure(for: block, preserveLockInPolicy: true)
+
+        controls.openResource(try XCTUnwrap(block.resources.first))
+
+        XCTAssertEqual(router.openedURLs.map(\.absoluteString), ["https://example.com/guide"])
+        XCTAssertNil(lockIn.pendingAttempt)
+    }
+
+    func testScheduleResourceCatalogDoesNotHardcodeSafari() {
+        XCTAssertFalse(
+            ScheduleResourceCatalog.templates.contains {
+                $0.label.localizedCaseInsensitiveCompare("Safari") == .orderedSame
+                    || $0.value == "com.apple.Safari"
+            }
+        )
+    }
+
+    func testLockInPolicyChangesWhenDefaultBrowserChanges() {
+        let focusBlock = ScheduleBlock(
+            id: "focus",
+            title: "Focused work",
+            startMinute: 600,
+            endMinute: 660,
+            category: .competition,
+            exactActions: "Use the assigned guide.",
+            finishTarget: "One saved artifact.",
+            resources: [.url("Guide", "https://example.com/guide")],
+            competition: Competition(rawValue: "Example")
+        )
+
+        let asidePolicy = LockInPolicy(
+            block: focusBlock,
+            additionalAllowedBundleIdentifiers: ["at.studio.asidebrowser"]
+        )
+        let alternatePolicy = LockInPolicy(
+            block: focusBlock,
+            additionalAllowedBundleIdentifiers: ["com.example.AlternateBrowser"]
+        )
+
+        XCTAssertNotEqual(asidePolicy, alternatePolicy)
+        XCTAssertTrue(asidePolicy.allows(bundleIdentifier: "at.studio.asidebrowser"))
+        XCTAssertFalse(asidePolicy.allows(bundleIdentifier: "com.example.AlternateBrowser"))
+    }
+
     func testMoreTimeRequestUsesConfiguredHardStopAndExplicitRollover() {
         let target = block(id: "focus", title: "Focus", start: 20 * 60, end: 21 * 60, category: .competition)
         let breakBlock = block(id: "break", title: "Break", start: 21 * 60, end: 22 * 60, category: .routine)
@@ -660,5 +760,20 @@ final class TopBuddyTests: XCTestCase {
             resources: [],
             competition: nil
         )
+    }
+}
+
+@MainActor
+private final class TestDefaultBrowserRouter: DefaultBrowserRouting {
+    let currentBrowser: DefaultBrowserIdentity
+    private(set) var openedURLs: [URL] = []
+
+    init(identity: DefaultBrowserIdentity) {
+        currentBrowser = identity
+    }
+
+    func open(_ url: URL) -> Bool {
+        openedURLs.append(url)
+        return true
     }
 }

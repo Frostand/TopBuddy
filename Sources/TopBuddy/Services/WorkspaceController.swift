@@ -15,6 +15,7 @@ final class WorkspaceController: ObservableObject {
     @Published private(set) var lastActionSummary = ""
 
     private let workspace: NSWorkspace
+    let defaultBrowserRouter: any DefaultBrowserRouting
     private let protectedBundleIDs: Set<String> = [
         "com.apple.finder",
         "com.apple.dock",
@@ -25,31 +26,49 @@ final class WorkspaceController: ObservableObject {
         "com.frostand.TopBuddy"
     ]
 
-    init(workspace: NSWorkspace = .shared) {
+    init(
+        workspace: NSWorkspace = .shared,
+        defaultBrowserRouter: (any DefaultBrowserRouting)? = nil
+    ) {
         self.workspace = workspace
+        self.defaultBrowserRouter = defaultBrowserRouter ?? SystemDefaultBrowserRouter(workspace: workspace)
         refreshRunningApps()
+    }
+
+    var currentDefaultBrowser: DefaultBrowserIdentity {
+        defaultBrowserRouter.currentBrowser
+    }
+
+    /// Returns the apps needed to carry out this block. A web block keeps the
+    /// current macOS default browser available; TopBuddy never assumes which
+    /// browser that is.
+    func allowedBundleIdentifiers(for block: ScheduleBlock) -> Set<String> {
+        var bundleIdentifiers = Set(
+            block.resources
+                .filter { $0.kind == .application }
+                .map(\.value)
+        )
+        let hasSafeURL = block.resources.contains { $0.kind == .url && $0.isSafeToOpen }
+        let browserBundleIdentifier = currentDefaultBrowser.bundleIdentifier
+        if hasSafeURL, !browserBundleIdentifier.isEmpty {
+            bundleIdentifiers.insert(browserBundleIdentifier)
+        }
+        return bundleIdentifiers
     }
 
     func prepare(
         block: ScheduleBlock,
         hideDistractions: Bool,
-        openURLsExternally: Bool = true,
         strictAllowlist: Bool = false
     ) {
-        let requiredBundleIDs = Set(
-            block.resources
-                .filter { $0.kind == .application }
-                .map(\.value)
-        )
+        let requiredBundleIDs = allowedBundleIdentifiers(for: block)
         if hideDistractions {
             hideUnrelatedApps(
                 keeping: requiredBundleIDs,
                 preserveCoachApps: !strictAllowlist
             )
         }
-        let openingResources = block.resources.filter { resource in
-            resource.openAtStart && (openURLsExternally || resource.kind == .application)
-        }
+        let openingResources = block.resources.filter(\.openAtStart)
         open(openingResources)
         lastActionSummary = openingResources.isEmpty
             ? "Focus started. No resources were set to open automatically."
@@ -63,7 +82,7 @@ final class WorkspaceController: ObservableObject {
             switch resource.kind {
             case .url:
                 guard let url = URL(string: resource.value) else { continue }
-                workspace.open(url)
+                _ = defaultBrowserRouter.open(url)
             case .application:
                 openApplication(bundleIdentifier: resource.value)
             }

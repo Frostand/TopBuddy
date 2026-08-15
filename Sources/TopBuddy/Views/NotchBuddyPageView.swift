@@ -56,7 +56,7 @@ struct NotchBuddyPageView: View {
                 .controlSize(.regular)
 
                 if model.lockInModeEnabled {
-                    Button("Open protected workspace", systemImage: "safari") {
+                    Button("Open Lock In controls", systemImage: "slider.horizontal.3") {
                         model.showLockInWindow()
                     }
                     .buttonStyle(.link)
