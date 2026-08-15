@@ -20,7 +20,7 @@ struct NotchFocusPageView: View {
                     Button("Reset", systemImage: "arrow.counterclockwise") { focus.resetTimer() }
                         .buttonStyle(.bordered)
                 }
-                .controlSize(.small)
+                .controlSize(.regular)
             }
             .frame(maxWidth: .infinity)
 

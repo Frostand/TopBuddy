@@ -76,7 +76,7 @@ struct NotchDisplayGeometry: Equatable, Sendable {
     }
 
     var activationRect: CGRect {
-        windowFrame(expanded: false).insetBy(dx: -10, dy: -5)
+        windowFrame(expanded: false).insetBy(dx: -18, dy: -10)
     }
 }
 

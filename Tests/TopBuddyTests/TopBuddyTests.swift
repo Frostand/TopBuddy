@@ -320,6 +320,15 @@ final class TopBuddyTests: XCTestCase {
         XCTAssertEqual(geometry.physicalNotchWidth, 216)
         XCTAssertEqual(geometry.windowFrame(expanded: false).maxY, geometry.screenFrame.maxY)
         XCTAssertEqual(geometry.windowFrame(expanded: true).midX, geometry.screenFrame.midX)
+        XCTAssertEqual(
+            geometry.activationRect.width - geometry.windowFrame(expanded: false).width,
+            36
+        )
+        XCTAssertEqual(
+            geometry.activationRect.height - geometry.windowFrame(expanded: false).height,
+            20
+        )
+        XCTAssertGreaterThanOrEqual(TopBuddyNotchDesign.minimumHitTarget, 44)
     }
 
     @MainActor

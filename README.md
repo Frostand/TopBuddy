@@ -40,7 +40,7 @@ Lock In is a focus aid, not parental-control or security software. It does not f
 
 ## Install the MVP
 
-The [`v0.2.0` GitHub prerelease](https://github.com/Frostand/TopBuddy/releases/tag/v0.2.0) contains a universal macOS app with Lock In focus kits. It is ad-hoc signed because the project does not yet have an Apple Developer ID certificate, so macOS may require the normal first-open confirmation. For the most transparent path, build from source:
+The [`v0.2.1` GitHub prerelease](https://github.com/Frostand/TopBuddy/releases/tag/v0.2.1) contains a universal macOS app with Lock In focus kits and a notch-matched, easier-to-click control surface. It is ad-hoc signed because the project does not yet have an Apple Developer ID certificate, so macOS may require the normal first-open confirmation. For the most transparent path, build from source:
 
 ```bash
 git clone https://github.com/Frostand/TopBuddy.git
@@ -76,7 +76,7 @@ swift build
 swift test -Xswiftc -warnings-as-errors
 ./script/privacy_audit.sh
 ./script/build_and_run.sh --verify
-./script/package_release.sh 0.2.0
+./script/package_release.sh 0.2.1
 ```
 
 `package_release.sh` creates a universal app zip and SHA-256 checksum. Set `TOPBUDDY_SIGNING_IDENTITY` and optionally `TOPBUDDY_NOTARY_PROFILE` to produce a Developer ID-signed and notarized package; otherwise it creates an honest ad-hoc-signed prerelease artifact.

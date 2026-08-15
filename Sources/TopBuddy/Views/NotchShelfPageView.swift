@@ -73,7 +73,7 @@ struct NotchShelfPageView: View {
             Text("Drop more")
                 .font(.caption.weight(.semibold))
         }
-        .frame(width: 96, height: 124)
+        .frame(width: 96, height: 160)
         .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 14))
         .overlay {
             RoundedRectangle(cornerRadius: 14)
@@ -87,25 +87,36 @@ struct NotchShelfPageView: View {
             Image(nsImage: NSWorkspace.shared.icon(forFile: item.path))
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 46, height: 46)
+                .frame(width: 40, height: 40)
             Text(item.name)
                 .font(.caption.weight(.semibold))
-                .lineLimit(2)
+                .lineLimit(1)
             Spacer(minLength: 0)
-            HStack(spacing: 9) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.fixed(TopBuddyNotchDesign.denseHitTarget), spacing: 8),
+                    GridItem(.fixed(TopBuddyNotchDesign.denseHitTarget))
+                ],
+                spacing: 6
+            ) {
                 Button { shelf.open(item) } label: { Image(systemName: "arrow.up.forward.app") }
                     .help("Open")
+                    .accessibilityLabel("Open \(item.name)")
                 Button { shelf.reveal(item) } label: { Image(systemName: "magnifyingglass") }
                     .help("Reveal in Finder")
+                    .accessibilityLabel("Reveal \(item.name) in Finder")
                 Button { shelf.share(item, from: NSApp.keyWindow?.contentView) } label: { Image(systemName: "square.and.arrow.up") }
                     .help("Share or AirDrop")
+                    .accessibilityLabel("Share \(item.name)")
                 Button(role: .destructive) { shelf.remove(item) } label: { Image(systemName: "xmark") }
                     .help("Remove shelf reference")
+                    .accessibilityLabel("Remove \(item.name) from shelf")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TopBuddyNotchIconButtonStyle(size: TopBuddyNotchDesign.denseHitTarget))
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(10)
-        .frame(width: 132, height: 124, alignment: .leading)
+        .frame(width: 132, height: 160, alignment: .leading)
         .background(Color.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 14))
         .contextMenu {
             Button("Open", action: { shelf.open(item) })

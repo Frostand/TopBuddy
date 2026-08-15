@@ -75,18 +75,22 @@ struct NotchMusicPageView: View {
                         Image(systemName: "backward.fill")
                             .font(.title2)
                     }
+                    .buttonStyle(TopBuddyNotchIconButtonStyle(size: 50))
+                    .accessibilityLabel("Previous track")
                     Button { Task { await music.perform(.playPause) } } label: {
                         Image(systemName: music.snapshot.state.isPlaying ? "pause.fill" : "play.fill")
                             .font(.title)
-                            .frame(width: 34, height: 34)
                     }
+                    .buttonStyle(TopBuddyNotchIconButtonStyle(size: 56, emphasized: true))
+                    .accessibilityLabel(music.snapshot.state.isPlaying ? "Pause" : "Play")
                     Button { Task { await music.perform(.nextTrack) } } label: {
                         Image(systemName: "forward.fill")
                             .font(.title2)
                     }
+                    .buttonStyle(TopBuddyNotchIconButtonStyle(size: 50))
+                    .accessibilityLabel("Next track")
                     Spacer()
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding(18)
@@ -102,10 +106,9 @@ struct NotchMusicPageView: View {
         }
         .overlay(alignment: .bottomTrailing) {
             Button("Open Music", systemImage: "arrow.up.forward.app", action: music.openMusic)
-                .buttonStyle(.plain)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.55))
-                .padding(14)
+                .buttonStyle(TopBuddyNotchTextButtonStyle())
+                .foregroundStyle(.white.opacity(0.72))
+                .padding(10)
         }
     }
 
@@ -120,6 +123,7 @@ struct NotchMusicPageView: View {
                 .foregroundStyle(.secondary)
             Button("Open Music", systemImage: "music.note", action: music.openMusic)
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -138,6 +142,7 @@ struct NotchMusicPageView: View {
                 .frame(maxWidth: 430)
             Button("Enable Apple Music controls") { Task { await music.enableControls() } }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .disabled(music.isBusy)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

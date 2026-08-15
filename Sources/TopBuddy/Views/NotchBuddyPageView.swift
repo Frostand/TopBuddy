@@ -53,14 +53,14 @@ struct NotchBuddyPageView: View {
                     }
                     .buttonStyle(.bordered)
                 }
-                .controlSize(.small)
+                .controlSize(.regular)
 
                 if model.lockInModeEnabled {
                     Button("Open protected workspace", systemImage: "safari") {
                         model.showLockInWindow()
                     }
                     .buttonStyle(.link)
-                    .controlSize(.small)
+                    .controlSize(.regular)
                 }
             } else {
                 Text("No active block")
@@ -113,10 +113,10 @@ struct NotchBuddyPageView: View {
                     .onSubmit(send)
                 Button(action: send) {
                     Image(systemName: model.codexIsRunning ? "ellipsis" : "arrow.up")
-                        .frame(width: 24, height: 24)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.circle)
+                .buttonStyle(TopBuddyNotchIconButtonStyle(emphasized: true))
+                .foregroundStyle(.white)
+                .accessibilityLabel("Send message")
                 .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.codexIsRunning)
             }
         }

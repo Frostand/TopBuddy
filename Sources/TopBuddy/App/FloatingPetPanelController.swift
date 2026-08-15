@@ -110,7 +110,7 @@ final class TopBuddyNotchPanelController {
             return
         }
 
-        let interactiveFrame = panel.frame.insetBy(dx: -12, dy: -8)
+        let interactiveFrame = panel.frame.insetBy(dx: -18, dy: -12)
         if interactiveFrame.contains(point) || presentation.isPinned || panel.isKeyWindow {
             exitDeadline = nil
             return
