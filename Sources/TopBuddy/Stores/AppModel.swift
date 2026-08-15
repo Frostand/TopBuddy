@@ -12,6 +12,8 @@ final class AppModel: ObservableObject {
     let fileShelf: FileShelfStore
     let focusUtility: FocusUtilityStore
     let calendarAgenda: CalendarAgendaStore
+    let lockIn: LockInStore
+    let focusBrowser: FocusBrowserStore
 
     @Published var onboardingComplete: Bool {
         didSet {
@@ -52,6 +54,16 @@ final class AppModel: ObservableObject {
             UserDefaults.standard.set(hardStopMinute, forKey: Self.hardStopKey)
         }
     }
+    @Published var lockInModeEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(lockInModeEnabled, forKey: Self.lockInModeKey)
+            if lockInModeEnabled {
+                startLockInMonitoring()
+            } else {
+                stopLockIn()
+            }
+        }
+    }
     @Published var statusMessage = "TopBuddy is ready."
     @Published var codexResponse = ""
     @Published var codexIsRunning = false
@@ -70,9 +82,12 @@ final class AppModel: ObservableObject {
     private static let notionWorkspaceKey = "topbuddy.notion-workspace-enabled"
     private static let codexCoachKey = "topbuddy.codex-coach-enabled"
     private static let hardStopKey = "topbuddy.hard-stop-minute"
+    private static let lockInModeKey = "topbuddy.lock-in-mode"
     private var monitorTask: Task<Void, Never>?
+    private var lockInMonitorTask: Task<Void, Never>?
     private var lastObservedBlockKey: String?
     private var notchPanelController: TopBuddyNotchPanelController?
+    private var lockInBrowserController: LockInBrowserWindowController?
 
     init(
         schedule: ScheduleStore? = nil,
@@ -83,9 +98,11 @@ final class AppModel: ObservableObject {
         musicHub: MusicHubStore? = nil,
         fileShelf: FileShelfStore? = nil,
         focusUtility: FocusUtilityStore? = nil,
-        calendarAgenda: CalendarAgendaStore? = nil
+        calendarAgenda: CalendarAgendaStore? = nil,
+        lockIn: LockInStore? = nil
     ) {
         let defaults = UserDefaults.standard
+        let lockInStore = lockIn ?? LockInStore()
         self.schedule = schedule ?? ScheduleStore()
         self.workspace = workspace ?? WorkspaceController()
         self.codex = codex
@@ -95,6 +112,8 @@ final class AppModel: ObservableObject {
         self.fileShelf = fileShelf ?? FileShelfStore()
         self.focusUtility = focusUtility ?? FocusUtilityStore()
         self.calendarAgenda = calendarAgenda ?? CalendarAgendaStore()
+        self.lockIn = lockInStore
+        self.focusBrowser = FocusBrowserStore(lockIn: lockInStore)
         self.onboardingComplete = defaults.bool(forKey: Self.onboardingKey)
         self.autoOpenResources = defaults.bool(forKey: Self.autoOpenKey)
         self.autoHideDistractions = defaults.bool(forKey: Self.autoHideKey)
@@ -107,6 +126,7 @@ final class AppModel: ObservableObject {
         self.hardStopMinute = savedHardStop == 0
             ? 23 * 60
             : min(24 * 60, max(18 * 60, savedHardStop))
+        self.lockInModeEnabled = defaults.bool(forKey: Self.lockInModeKey)
     }
 
     func startMonitoring() {
@@ -117,6 +137,10 @@ final class AppModel: ObservableObject {
             await self?.petLibrary.prepare()
         }
         if onboardingComplete && floatingPetEnabled { showFloatingPet() }
+        if lockInModeEnabled { startLockInMonitoring() }
+        if lockInModeEnabled, let block = schedule.currentBlock {
+            prepareLockIn(for: block, showWindow: false)
+        }
         monitorTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(20))
@@ -130,6 +154,8 @@ final class AppModel: ObservableObject {
     func stopMonitoring() {
         monitorTask?.cancel()
         monitorTask = nil
+        lockInMonitorTask?.cancel()
+        lockInMonitorTask = nil
     }
 
     func showFloatingPet() {
@@ -170,8 +196,76 @@ final class AppModel: ObservableObject {
     }
 
     func start(_ block: ScheduleBlock) {
+        if lockInModeEnabled {
+            guard schedule.currentBlock?.id == block.id else {
+                statusMessage = "Lock In can protect only the block happening now."
+                return
+            }
+            prepareLockIn(for: block, showWindow: true)
+            return
+        }
         workspace.prepare(block: block, hideDistractions: autoHideDistractions)
         statusMessage = "Started \(block.title). \(workspace.lastActionSummary)"
+    }
+
+    func open(_ resource: ResourceTarget, for block: ScheduleBlock) {
+        if lockInModeEnabled {
+            guard schedule.currentBlock?.id == block.id else {
+                statusMessage = "That resource belongs to a different block and remains blocked."
+                return
+            }
+            if lockIn.activePolicy?.blockID != block.id {
+                focusBrowser.configure(for: block)
+            }
+            switch resource.kind {
+            case .url:
+                focusBrowser.requestLoad(resource)
+                showLockInWindow()
+            case .application:
+                guard lockIn.allowedBundleIdentifiers().contains(resource.value) else {
+                    statusMessage = "That app is not in this block's Lock In focus kit."
+                    return
+                }
+                workspace.open([resource])
+            }
+        } else {
+            workspace.open([resource])
+        }
+    }
+
+    func toggleLockInMode(for block: ScheduleBlock? = nil) {
+        if lockInModeEnabled {
+            lockInModeEnabled = false
+            statusMessage = "Lock In ended. No apps were quit."
+        } else {
+            let candidate = block ?? schedule.currentBlock
+            if let candidate, schedule.currentBlock?.id != candidate.id {
+                statusMessage = "Lock In can protect only the block happening now."
+                return
+            }
+            lockInModeEnabled = true
+            guard let candidate else {
+                statusMessage = "Lock In is on and waiting for the next schedule block."
+                return
+            }
+            prepareLockIn(for: candidate, showWindow: true)
+        }
+    }
+
+    func showLockInWindow() {
+        if lockInBrowserController == nil {
+            lockInBrowserController = LockInBrowserWindowController(
+                browser: focusBrowser,
+                lockIn: lockIn,
+                onEndLockIn: { [weak self] in
+                    self?.lockInModeEnabled = false
+                },
+                onGranted: { [weak self] attempt in
+                    self?.resume(after: attempt)
+                }
+            )
+        }
+        lockInBrowserController?.show()
     }
 
     func hideDistractionsNow() {
@@ -302,6 +396,7 @@ final class AppModel: ObservableObject {
         showNotch: Bool,
         autoOpenResources: Bool,
         autoHideDistractions: Bool,
+        lockInModeEnabled: Bool,
         quitReviewEnabled: Bool,
         notionWorkspaceEnabled: Bool,
         codexCoachEnabled: Bool,
@@ -309,6 +404,7 @@ final class AppModel: ObservableObject {
     ) {
         self.autoOpenResources = autoOpenResources
         self.autoHideDistractions = autoHideDistractions
+        self.lockInModeEnabled = lockInModeEnabled
         self.quitReviewEnabled = quitReviewEnabled
         self.notionWorkspaceEnabled = notionWorkspaceEnabled
         self.codexCoachEnabled = codexCoachEnabled
@@ -326,13 +422,18 @@ final class AppModel: ObservableObject {
     }
 
     private func observeBlockTransition(allowAutomation: Bool) {
-        guard let block = schedule.currentBlock else { return }
+        guard let block = schedule.currentBlock else {
+            suspendLockInIfNeeded()
+            return
+        }
         let dateKey = ScheduleImportParser.dateKey(for: schedule.now)
         let key = "\(dateKey)|\(block.id)"
         guard key != lastObservedBlockKey else { return }
         lastObservedBlockKey = key
         statusMessage = "Now: \(block.title)"
-        if allowAutomation && autoOpenResources {
+        if allowAutomation && lockInModeEnabled {
+            prepareLockIn(for: block, showWindow: true)
+        } else if allowAutomation && autoOpenResources {
             workspace.prepare(block: block, hideDistractions: autoHideDistractions)
             statusMessage = "TopBuddy prepared \(block.title). \(workspace.lastActionSummary)"
         } else if allowAutomation && autoHideDistractions {
@@ -342,7 +443,7 @@ final class AppModel: ObservableObject {
 
     private func scheduleContext() -> String {
         let current = schedule.currentBlock.map {
-            "Current: \($0.timeLabel) — \($0.title)\nActions: \($0.exactActions)\nFinish target: \($0.finishTarget)\nResources: \($0.resources.map(\.label).joined(separator: ", "))"
+            "Current: \($0.timeLabel) — \($0.title)\nActions: \($0.exactActions)\nFinish target: \($0.finishTarget)\nResources: \($0.resources.map(\.label).joined(separator: ", "))\nMaterials: \($0.materials.map { "\($0.label): \($0.detail)" }.joined(separator: ", "))\nLock In: \(lockInModeEnabled ? "active" : "off")"
         } ?? "Current: no active block"
         let next = schedule.nextBlock.map {
             "Next: \($0.timeLabel) — \($0.title)\nFinish target: \($0.finishTarget)"
@@ -360,5 +461,76 @@ final class AppModel: ObservableObject {
         let suffix = hour24 < 12 ? "AM" : "PM"
         let hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12
         return String(format: "%d:%02d %@", hour12, minutePart, suffix)
+    }
+
+    private func prepareLockIn(for block: ScheduleBlock, showWindow: Bool) {
+        focusBrowser.configure(for: block)
+        workspace.prepare(
+            block: block,
+            hideDistractions: true,
+            openURLsExternally: false,
+            strictAllowlist: true
+        )
+        startLockInMonitoring()
+        if showWindow || block.resources.contains(where: { $0.kind == .url && $0.openAtStart }) {
+            showLockInWindow()
+        }
+        statusMessage = "Locked in to \(block.title). Only its focus kit is allowed; nothing was quit."
+    }
+
+    private func startLockInMonitoring() {
+        guard lockInModeEnabled, lockInMonitorTask == nil else { return }
+        lockInMonitorTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(700))
+                guard let self, self.lockInModeEnabled else { return }
+                self.enforceLockIn()
+            }
+        }
+    }
+
+    private func stopLockIn() {
+        lockInMonitorTask?.cancel()
+        lockInMonitorTask = nil
+        lockIn.stop()
+        lockInBrowserController?.close()
+    }
+
+    private func enforceLockIn() {
+        guard let block = schedule.currentBlock else {
+            suspendLockInIfNeeded()
+            return
+        }
+        if lockIn.activePolicy != LockInPolicy(block: block) {
+            prepareLockIn(for: block, showWindow: true)
+        }
+        let allowed = lockIn.allowedBundleIdentifiers()
+        focusBrowser.enforceCurrentAccess()
+        guard let blocked = workspace.blockFrontmostApplication(keeping: allowed) else { return }
+        if lockIn.registerBlockedApplication(
+            name: blocked.name,
+            bundleIdentifier: blocked.bundleIdentifier
+        ) {
+            statusMessage = "Lock In blocked \(blocked.name). Add a specific timed reason if it is necessary."
+            showLockInWindow()
+        }
+    }
+
+    private func resume(after attempt: LockInAttempt) {
+        switch attempt.kind {
+        case .application:
+            workspace.open([
+                .application(attempt.label, bundleIdentifier: attempt.value)
+            ])
+        case .website:
+            focusBrowser.resumeAfterGrant(attempt)
+        }
+    }
+
+    private func suspendLockInIfNeeded() {
+        guard lockIn.isActive else { return }
+        lockIn.stop()
+        lockInBrowserController?.close()
+        statusMessage = "Lock In is on and waiting for the next schedule block."
     }
 }

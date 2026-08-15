@@ -47,15 +47,32 @@ struct ResourceTarget: Codable, Hashable, Identifiable, Sendable {
     let kind: Kind
     let label: String
     let value: String
+    let openAtStart: Bool
 
     var id: String { "\(kind.rawValue):\(value)" }
 
-    static func url(_ label: String, _ value: String) -> ResourceTarget {
-        ResourceTarget(kind: .url, label: label, value: value)
+    init(kind: Kind, label: String, value: String, openAtStart: Bool = true) {
+        self.kind = kind
+        self.label = label
+        self.value = value
+        self.openAtStart = openAtStart
     }
 
-    static func application(_ label: String, bundleIdentifier: String) -> ResourceTarget {
-        ResourceTarget(kind: .application, label: label, value: bundleIdentifier)
+    static func url(_ label: String, _ value: String, openAtStart: Bool = true) -> ResourceTarget {
+        ResourceTarget(kind: .url, label: label, value: value, openAtStart: openAtStart)
+    }
+
+    static func application(
+        _ label: String,
+        bundleIdentifier: String,
+        openAtStart: Bool = true
+    ) -> ResourceTarget {
+        ResourceTarget(
+            kind: .application,
+            label: label,
+            value: bundleIdentifier,
+            openAtStart: openAtStart
+        )
     }
 
     var isSafeToOpen: Bool {
@@ -83,6 +100,25 @@ struct ResourceTarget: Codable, Hashable, Identifiable, Sendable {
                 }
         }
     }
+
+    func replacingOpenAtStart(_ openAtStart: Bool) -> ResourceTarget {
+        ResourceTarget(kind: kind, label: label, value: value, openAtStart: openAtStart)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case kind
+        case label
+        case value
+        case openAtStart
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try container.decode(Kind.self, forKey: .kind)
+        label = try container.decode(String.self, forKey: .label)
+        value = try container.decode(String.self, forKey: .value)
+        openAtStart = try container.decodeIfPresent(Bool.self, forKey: .openAtStart) ?? true
+    }
 }
 
 struct ScheduleBlock: Identifiable, Codable, Hashable, Sendable {
@@ -94,7 +130,32 @@ struct ScheduleBlock: Identifiable, Codable, Hashable, Sendable {
     let exactActions: String
     let finishTarget: String
     let resources: [ResourceTarget]
+    let materials: [StudyMaterial]
     let competition: Competition?
+
+    init(
+        id: String,
+        title: String,
+        startMinute: Int,
+        endMinute: Int,
+        category: BlockCategory,
+        exactActions: String,
+        finishTarget: String,
+        resources: [ResourceTarget],
+        materials: [StudyMaterial] = [],
+        competition: Competition?
+    ) {
+        self.id = id
+        self.title = title
+        self.startMinute = startMinute
+        self.endMinute = endMinute
+        self.category = category
+        self.exactActions = exactActions
+        self.finishTarget = finishTarget
+        self.resources = resources
+        self.materials = materials
+        self.competition = competition
+    }
 
     var durationMinutes: Int {
         endMinute >= startMinute
@@ -123,6 +184,7 @@ struct ScheduleBlock: Identifiable, Codable, Hashable, Sendable {
             exactActions: exactActions,
             finishTarget: finishTarget,
             resources: resources,
+            materials: materials,
             competition: competition
         )
     }
@@ -137,8 +199,54 @@ struct ScheduleBlock: Identifiable, Codable, Hashable, Sendable {
             exactActions: exactActions,
             finishTarget: finishTarget,
             resources: resources,
+            materials: materials,
             competition: competition
         )
+    }
+
+    func replacingFocusKit(
+        resources: [ResourceTarget],
+        materials: [StudyMaterial]
+    ) -> ScheduleBlock {
+        ScheduleBlock(
+            id: id,
+            title: title,
+            startMinute: startMinute,
+            endMinute: endMinute,
+            category: category,
+            exactActions: exactActions,
+            finishTarget: finishTarget,
+            resources: resources,
+            materials: materials,
+            competition: competition
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case startMinute
+        case endMinute
+        case category
+        case exactActions
+        case finishTarget
+        case resources
+        case materials
+        case competition
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        startMinute = try container.decode(Int.self, forKey: .startMinute)
+        endMinute = try container.decode(Int.self, forKey: .endMinute)
+        category = try container.decode(BlockCategory.self, forKey: .category)
+        exactActions = try container.decode(String.self, forKey: .exactActions)
+        finishTarget = try container.decode(String.self, forKey: .finishTarget)
+        resources = try container.decodeIfPresent([ResourceTarget].self, forKey: .resources) ?? []
+        materials = try container.decodeIfPresent([StudyMaterial].self, forKey: .materials) ?? []
+        competition = try container.decodeIfPresent(Competition.self, forKey: .competition)
     }
 
     private static func format(minute: Int) -> String {

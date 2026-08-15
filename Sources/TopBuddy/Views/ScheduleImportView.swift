@@ -107,7 +107,7 @@ struct ScheduleImportView: View {
                         Text(block.title)
                             .font(.callout.weight(.semibold))
                         if !block.resources.isEmpty {
-                            Text("Opens \(block.resources.map(\.label).joined(separator: ", "))")
+                            Text("Focus kit: \(block.resources.map(\.label).joined(separator: ", "))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(2)

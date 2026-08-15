@@ -2,10 +2,12 @@ import Foundation
 
 enum ScheduleImportError: LocalizedError, Equatable {
     case noRows
+    case unsupportedSchema(Int)
     case malformedRow(Int)
     case invalidTime(String)
     case invalidBlock(String)
     case invalidResource(String)
+    case invalidMaterial(String)
     case duplicateID(String)
     case overlap(String, String)
     case wrongDate(String)
@@ -14,6 +16,8 @@ enum ScheduleImportError: LocalizedError, Equatable {
         switch self {
         case .noRows:
             "No schedule rows were found. Paste a four-column Markdown table or tab-separated rows."
+        case let .unsupportedSchema(version):
+            "Schedule schema version \(version) is not supported. TopBuddy accepts versions 1 and 2."
         case let .malformedRow(line):
             "Line \(line) does not have Time, Task, Exact actions, and Finish target columns."
         case let .invalidTime(value):
@@ -22,6 +26,8 @@ enum ScheduleImportError: LocalizedError, Equatable {
             "\(title) has an invalid or zero-length time range."
         case let .invalidResource(label):
             "\(label) is not a safe HTTPS, localhost, or application resource."
+        case let .invalidMaterial(label):
+            "\(label) is not a valid study material entry."
         case let .duplicateID(id):
             "The schedule contains a duplicate block ID: \(id)."
         case let .overlap(first, second):
@@ -52,6 +58,9 @@ enum ScheduleValidator {
             }
             if let invalid = block.resources.first(where: { !$0.isSafeToOpen }) {
                 throw ScheduleImportError.invalidResource(invalid.label)
+            }
+            if let invalid = block.materials.first(where: { !$0.isValid }) {
+                throw ScheduleImportError.invalidMaterial(invalid.label)
             }
         }
 
@@ -110,6 +119,7 @@ struct ScheduleImportParser {
                     exactActions: columns[2].trimmingCharacters(in: .whitespacesAndNewlines),
                     finishTarget: columns[3...].joined(separator: " | ").trimmingCharacters(in: .whitespacesAndNewlines),
                     resources: ScheduleResourceCatalog.inferredResources(for: title),
+                    materials: [],
                     competition: ScheduleResourceCatalog.inferredCompetition(for: title)
                 )
             )

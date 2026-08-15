@@ -30,19 +30,30 @@ final class WorkspaceController: ObservableObject {
         refreshRunningApps()
     }
 
-    func prepare(block: ScheduleBlock, hideDistractions: Bool) {
+    func prepare(
+        block: ScheduleBlock,
+        hideDistractions: Bool,
+        openURLsExternally: Bool = true,
+        strictAllowlist: Bool = false
+    ) {
         let requiredBundleIDs = Set(
             block.resources
                 .filter { $0.kind == .application }
                 .map(\.value)
         )
         if hideDistractions {
-            hideUnrelatedApps(keeping: requiredBundleIDs)
+            hideUnrelatedApps(
+                keeping: requiredBundleIDs,
+                preserveCoachApps: !strictAllowlist
+            )
         }
-        open(block.resources)
-        lastActionSummary = block.resources.isEmpty
-            ? "Focus started. This block has no external resources."
-            : "Opened \(block.resources.count) resource\(block.resources.count == 1 ? "" : "s") for \(block.title)."
+        let openingResources = block.resources.filter { resource in
+            resource.openAtStart && (openURLsExternally || resource.kind == .application)
+        }
+        open(openingResources)
+        lastActionSummary = openingResources.isEmpty
+            ? "Focus started. No resources were set to open automatically."
+            : "Opened \(openingResources.count) resource\(openingResources.count == 1 ? "" : "s") for \(block.title)."
         refreshRunningApps()
     }
 
@@ -59,14 +70,44 @@ final class WorkspaceController: ObservableObject {
         }
     }
 
-    func hideUnrelatedApps(keeping requiredBundleIDs: Set<String> = []) {
+    func hideUnrelatedApps(
+        keeping requiredBundleIDs: Set<String> = [],
+        preserveCoachApps: Bool = true
+    ) {
         let allowed = protectedBundleIDs.union(requiredBundleIDs)
         for app in workspace.runningApplications where app.activationPolicy == .regular {
-            guard !isProtected(app, additionalAllowed: allowed) else { continue }
+            guard !isProtected(
+                app,
+                additionalAllowed: allowed,
+                preserveCoachApps: preserveCoachApps
+            ) else { continue }
             _ = app.hide()
         }
         lastActionSummary = "Hid unrelated apps. Nothing was quit."
         refreshRunningApps()
+    }
+
+    func blockFrontmostApplication(
+        keeping requiredBundleIDs: Set<String>
+    ) -> RunningAppInfo? {
+        guard let app = workspace.frontmostApplication,
+              app.activationPolicy == .regular,
+              !app.isTerminated,
+              let bundleID = app.bundleIdentifier,
+              !isProtected(
+                  app,
+                  additionalAllowed: requiredBundleIDs,
+                  preserveCoachApps: false
+              ) else { return nil }
+        let info = RunningAppInfo(
+            processIdentifier: app.processIdentifier,
+            bundleIdentifier: bundleID,
+            name: app.localizedName ?? bundleID
+        )
+        _ = app.hide()
+        lastActionSummary = "Lock In hid \(info.name). Nothing was quit."
+        refreshRunningApps()
+        return info
     }
 
     /// Requests normal app termination. Never uses forceTerminate().
@@ -119,13 +160,15 @@ final class WorkspaceController: ObservableObject {
 
     private func isProtected(
         _ app: NSRunningApplication,
-        additionalAllowed: Set<String>
+        additionalAllowed: Set<String>,
+        preserveCoachApps: Bool = true
     ) -> Bool {
         guard let bundleID = app.bundleIdentifier else { return true }
         if protectedBundleIDs.contains(bundleID) || additionalAllowed.contains(bundleID) {
             return true
         }
         let lowercaseID = bundleID.lowercased()
-        return lowercaseID.contains("openai") || lowercaseID.contains("chatgpt") || app == .current
+        let isCoachApp = lowercaseID.contains("openai") || lowercaseID.contains("chatgpt")
+        return app == .current || (preserveCoachApps && isCoachApp)
     }
 }

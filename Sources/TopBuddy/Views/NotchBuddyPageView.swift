@@ -43,7 +43,10 @@ struct NotchBuddyPageView: View {
                 HStack(spacing: 8) {
                     Button("Start", systemImage: "play.fill") { model.startCurrentBlock() }
                         .buttonStyle(.borderedProminent)
-                    Button("Hide distractions", systemImage: "eye.slash") { model.hideDistractionsNow() }
+                    Button(
+                        model.lockInModeEnabled ? "Unlock" : "Lock In",
+                        systemImage: model.lockInModeEnabled ? "lock.open.fill" : "lock.fill"
+                    ) { model.toggleLockInMode(for: block) }
                         .buttonStyle(.bordered)
                     Button(schedule.isCompleted(block) ? "Reopen" : "Done", systemImage: schedule.isCompleted(block) ? "arrow.uturn.backward" : "checkmark") {
                         model.toggleCurrentCompletion()
@@ -51,6 +54,14 @@ struct NotchBuddyPageView: View {
                     .buttonStyle(.bordered)
                 }
                 .controlSize(.small)
+
+                if model.lockInModeEnabled {
+                    Button("Open protected workspace", systemImage: "safari") {
+                        model.showLockInWindow()
+                    }
+                    .buttonStyle(.link)
+                    .controlSize(.small)
+                }
             } else {
                 Text("No active block")
                     .font(.headline)

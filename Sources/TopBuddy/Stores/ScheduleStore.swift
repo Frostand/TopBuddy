@@ -90,8 +90,20 @@ final class ScheduleStore: ObservableObject {
     }
 
     func updateResources(for blockID: String, resources: [ResourceTarget]) throws {
+        try updateFocusKit(for: blockID, resources: resources, materials: nil)
+    }
+
+    func updateFocusKit(
+        for blockID: String,
+        resources: [ResourceTarget],
+        materials: [StudyMaterial]?
+    ) throws {
         let blocks = todayBlocks.map { block in
-            block.id == blockID ? block.replacingResources(resources) : block
+            guard block.id == blockID else { return block }
+            return block.replacingFocusKit(
+                resources: resources,
+                materials: materials ?? block.materials
+            )
         }
         let document = DailyScheduleDocument(
             date: ScheduleImportParser.dateKey(for: now, calendar: calendar),

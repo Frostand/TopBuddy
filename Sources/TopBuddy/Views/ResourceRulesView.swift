@@ -8,9 +8,13 @@ struct ResourceRulesView: View {
 
     @State private var selectedBlockID: String?
     @State private var resources: [ResourceTarget] = []
+    @State private var materials: [StudyMaterial] = []
     @State private var customKind: ResourceTarget.Kind = .url
     @State private var customLabel = ""
     @State private var customValue = ""
+    @State private var materialKind: StudyMaterial.Kind = .book
+    @State private var materialLabel = ""
+    @State private var materialDetail = ""
     @State private var errorMessage = ""
 
     init(initialBlockID: String? = nil) {
@@ -72,7 +76,7 @@ struct ResourceRulesView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Focus kits")
                     .font(.title2.weight(.semibold))
-                Text("Choose exactly what TopBuddy opens and keeps visible for each block.")
+                Text("Choose exactly what TopBuddy opens, allows, and tells you to bring for each block.")
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -94,7 +98,7 @@ struct ResourceRulesView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    PetSectionLabel(title: "Opens at start", systemImage: "arrow.up.forward.app")
+                    PetSectionLabel(title: "Allowed apps and websites", systemImage: "checkmark.shield")
                     if resources.isEmpty {
                         ContentUnavailableView(
                             "No resources assigned",
@@ -118,6 +122,15 @@ struct ResourceRulesView: View {
                                         .truncationMode(.middle)
                                 }
                                 Spacer()
+                                Toggle(
+                                    "Open at start",
+                                    isOn: Binding(
+                                        get: { resource.openAtStart },
+                                        set: { updateOpenAtStart(resource, value: $0) }
+                                    )
+                                )
+                                .toggleStyle(.checkbox)
+                                .controlSize(.small)
                                 Button(role: .destructive) {
                                     resources.removeAll { $0.id == resource.id }
                                 } label: {
@@ -176,6 +189,68 @@ struct ResourceRulesView: View {
                     }
                 }
 
+                VStack(alignment: .leading, spacing: 10) {
+                    PetSectionLabel(title: "Books, files, and physical materials", systemImage: "book.closed")
+                    if materials.isEmpty {
+                        Text("No offline materials assigned.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(materials) { material in
+                            HStack(spacing: 10) {
+                                Image(systemName: material.kind.systemImage)
+                                    .foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(material.label)
+                                        .font(.callout.weight(.medium))
+                                    Text(material.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .textSelection(.enabled)
+                                }
+                                Spacer()
+                                Button(role: .destructive) {
+                                    materials.removeAll { $0.id == material.id }
+                                } label: {
+                                    Image(systemName: "minus.circle.fill")
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                            .padding(10)
+                            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 11))
+                        }
+                    }
+                }
+
+                GroupBox("Add material") {
+                    Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
+                        GridRow {
+                            Text("Type")
+                            Picker("Type", selection: $materialKind) {
+                                ForEach(StudyMaterial.Kind.allCases, id: \.self) { kind in
+                                    Text(kind.rawValue.capitalized).tag(kind)
+                                }
+                            }
+                            .labelsHidden()
+                        }
+                        GridRow {
+                            Text("Label")
+                            TextField("Example: Omega textbook", text: $materialLabel)
+                        }
+                        GridRow {
+                            Text("Details")
+                            TextField("Example: Chapter 2, pages 27–40", text: $materialDetail)
+                        }
+                    }
+                    .padding(.vertical, 5)
+
+                    HStack {
+                        Spacer()
+                        Button("Add material", systemImage: "plus") { addMaterial() }
+                            .disabled(!canAddMaterial)
+                    }
+                }
+
                 if !errorMessage.isEmpty {
                     Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                         .font(.callout)
@@ -188,7 +263,7 @@ struct ResourceRulesView: View {
 
     private var footer: some View {
         HStack {
-            Text("Other regular apps are hidden only when Auto-hide is enabled.")
+            Text("Lock In hides unlisted apps and keeps unlisted sites out of its browser. It never force-quits anything.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -212,6 +287,7 @@ struct ResourceRulesView: View {
 
     private func loadSelection() {
         resources = selectedBlock?.resources ?? []
+        materials = selectedBlock?.materials ?? []
         errorMessage = ""
     }
 
@@ -236,10 +312,39 @@ struct ResourceRulesView: View {
         customValue = ""
     }
 
+    private var canAddMaterial: Bool {
+        StudyMaterial(
+            kind: materialKind,
+            label: materialLabel.trimmingCharacters(in: .whitespacesAndNewlines),
+            detail: materialDetail.trimmingCharacters(in: .whitespacesAndNewlines)
+        ).isValid
+    }
+
+    private func addMaterial() {
+        let material = StudyMaterial(
+            kind: materialKind,
+            label: materialLabel.trimmingCharacters(in: .whitespacesAndNewlines),
+            detail: materialDetail.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        guard material.isValid, !materials.contains(material) else { return }
+        materials.append(material)
+        materialLabel = ""
+        materialDetail = ""
+    }
+
+    private func updateOpenAtStart(_ resource: ResourceTarget, value: Bool) {
+        guard let index = resources.firstIndex(where: { $0.id == resource.id }) else { return }
+        resources[index] = resource.replacingOpenAtStart(value)
+    }
+
     private func save() {
         guard let selectedBlockID else { return }
         do {
-            try schedule.updateResources(for: selectedBlockID, resources: resources)
+            try schedule.updateFocusKit(
+                for: selectedBlockID,
+                resources: resources,
+                materials: materials
+            )
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

@@ -37,6 +37,17 @@ struct MenuBarView: View {
                         model.startCurrentBlock()
                     }
                     Button(
+                        model.lockInModeEnabled ? "End Lock In" : "Start Lock In",
+                        systemImage: model.lockInModeEnabled ? "lock.open.fill" : "lock.fill"
+                    ) {
+                        model.toggleLockInMode(for: block)
+                    }
+                    if model.lockInModeEnabled {
+                        Button("Show Lock In browser", systemImage: "safari") {
+                            model.showLockInWindow()
+                        }
+                    }
+                    Button(
                         schedule.isCompleted(block) ? "Reopen block" : "Mark block done",
                         systemImage: schedule.isCompleted(block) ? "arrow.uturn.backward" : "checkmark"
                     ) {
