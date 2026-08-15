@@ -31,7 +31,10 @@ struct TopBuddyNotchView: View {
         .clipShape(TopBuddyNotchShape(expanded: presentation.isExpanded))
         .contentShape(TopBuddyNotchShape(expanded: presentation.isExpanded))
         .preferredColorScheme(.dark)
-        .animation(reduceMotion ? nil : .snappy(duration: 0.27), value: presentation.isExpanded)
+        .animation(
+            reduceMotion ? nil : .snappy(duration: presentation.timing.contentAnimationDuration),
+            value: presentation.isExpanded
+        )
         .onTapGesture {
             if !presentation.isExpanded {
                 presentation.expand(

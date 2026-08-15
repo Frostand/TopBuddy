@@ -1,6 +1,36 @@
 import AppKit
 import Foundation
 
+/// Shared timing budgets for the top-anchored notch interaction.
+///
+/// Keeping these values together makes the pointer sampler, AppKit panel, and
+/// SwiftUI content transition move as one interaction instead of each layer
+/// accumulating its own latency.
+struct NotchInteractionTiming: Equatable, Sendable {
+    let pointerSamplingInterval: TimeInterval
+    let frameAnimationDuration: TimeInterval
+    let contentAnimationDuration: TimeInterval
+    let exitGraceDuration: TimeInterval
+
+    /// The responsive profile used by the live notch surface.
+    static let responsive = NotchInteractionTiming(
+        pointerSamplingInterval: 1.0 / 60.0,
+        frameAnimationDuration: 0.10,
+        contentAnimationDuration: 0.09,
+        exitGraceDuration: 0.20
+    )
+
+    /// Pointer sampling plus the frame movement should feel like one gesture.
+    var pointerAndFrameOpenBudget: TimeInterval {
+        pointerSamplingInterval + frameAnimationDuration
+    }
+
+    /// Exit grace plus the frame movement bounds the close path.
+    var totalCloseBudget: TimeInterval {
+        exitGraceDuration + frameAnimationDuration
+    }
+}
+
 enum TopBuddyNotchPage: String, CaseIterable, Identifiable, Sendable {
     case buddy
     case music

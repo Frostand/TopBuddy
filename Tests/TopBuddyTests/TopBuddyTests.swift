@@ -331,6 +331,18 @@ final class TopBuddyTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(TopBuddyNotchDesign.minimumHitTarget, 44)
     }
 
+    func testNotchInteractionTimingDefaultsMeetResponsiveBudgets() {
+        let timing = NotchInteractionTiming.responsive
+
+        XCTAssertLessThanOrEqual(timing.pointerSamplingInterval, 1.0 / 60.0)
+        XCTAssertLessThanOrEqual(timing.frameAnimationDuration, 0.10)
+        XCTAssertLessThanOrEqual(timing.contentAnimationDuration, 0.10)
+        XCTAssertLessThanOrEqual(timing.pointerAndFrameOpenBudget, 0.12)
+        XCTAssertGreaterThanOrEqual(timing.exitGraceDuration, 0.18)
+        XCTAssertLessThanOrEqual(timing.exitGraceDuration, 0.22)
+        XCTAssertLessThanOrEqual(timing.totalCloseBudget, 0.32)
+    }
+
     @MainActor
     func testNotchPresentationHoverClickPinAndCollapse() {
         let geometry = NotchDisplayGeometry(
