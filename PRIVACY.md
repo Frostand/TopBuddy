@@ -11,6 +11,7 @@ TopBuddy may store the following under `~/Library/Application Support/TopBuddy` 
 - selected pet metadata and pet image assets;
 - file-shelf paths, never copies of shelf files;
 - focus-kit resource labels, HTTPS URLs, localhost URLs, and app bundle identifiers;
+- focus-kit book, file, physical-material, and note labels supplied by the schedule;
 - user-selected settings;
 - Notion WebKit cookies and website data in WebKit's normal local store.
 
@@ -27,6 +28,7 @@ Schedule, pet, shelf, and metadata files are written with owner-only permissions
 | Apple Music | User selects Enable or chooses it during setup | Fixed local Apple Events commands to the Music app | macOS Automation |
 | Apple Calendar | User selects Enable or chooses it during setup | No network data added by TopBuddy; event title/time/calendar are read into app memory | macOS Calendar read access |
 | Resource opening | User presses Start, or enables automatic opening | The Mac opens only validated HTTPS, HTTP-loopback, or installed-app resources | No broad automation permission |
+| Lock In browser | User enables Lock In and opens an approved site | Normal website traffic and WebKit session data can reach the selected site and third-party services embedded by that site; TopBuddy constrains top-level navigation, not webpage subresources | No macOS permission |
 
 TopBuddy never reads or copies Codex authentication files. It invokes the installed executable with `--ephemeral` and `--sandbox read-only` from a fresh owner-only empty temporary working directory, then removes that directory after the response.
 
@@ -36,6 +38,9 @@ Calendar and Music each have an app-level enabled state in addition to macOS aut
 
 - Automatic opening and hiding are off in the Observe and Assist presets.
 - Auto-hide only calls the normal macOS hide operation.
+- Lock In checks the frontmost regular app and hides it when its bundle identifier is not in the active block's focus kit. It does not inspect app documents or screen contents.
+- Lock In exception reasons and grants are kept only in memory and are cleared when Lock In ends or the active block changes.
+- Lock In is an assistive focus boundary, not parental-control, firewall, or tamper-resistant software. The user can end it immediately.
 - Quitting is never automatic. A user must enable the tool, choose running apps, confirm, and let each app handle its normal save prompts.
 - TopBuddy never force-quits another app.
 

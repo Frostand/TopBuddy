@@ -9,7 +9,7 @@ struct DailyScheduleDocument: Codable, Equatable, Sendable {
     let rollover: [String]
 
     init(
-        schemaVersion: Int = 1,
+        schemaVersion: Int = 2,
         date: String,
         refreshedAt: String,
         source: String,

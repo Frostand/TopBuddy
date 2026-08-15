@@ -18,6 +18,9 @@ final class ScheduleHandoffStore {
         guard FileManager.default.fileExists(atPath: handoffURL.path) else { return nil }
         let data = try Data(contentsOf: handoffURL)
         let document = try JSONDecoder().decode(DailyScheduleDocument.self, from: data)
+        guard (1...2).contains(document.schemaVersion) else {
+            throw ScheduleImportError.unsupportedSchema(document.schemaVersion)
+        }
         let expectedDate = ScheduleImportParser.dateKey(for: date, calendar: calendar)
         guard document.date == expectedDate else { throw ScheduleImportError.wrongDate(document.date) }
         try ScheduleValidator.validate(document.blocks)
@@ -25,6 +28,9 @@ final class ScheduleHandoffStore {
     }
 
     func write(_ document: DailyScheduleDocument) throws {
+        guard (1...2).contains(document.schemaVersion) else {
+            throw ScheduleImportError.unsupportedSchema(document.schemaVersion)
+        }
         try ScheduleValidator.validate(document.blocks)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

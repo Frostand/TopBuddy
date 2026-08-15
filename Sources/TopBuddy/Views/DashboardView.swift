@@ -217,6 +217,16 @@ struct DashboardView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
+                model.toggleLockInMode(for: selectedBlock)
+            } label: {
+                Label(
+                    model.lockInModeEnabled ? "End Lock In" : "Lock In",
+                    systemImage: model.lockInModeEnabled ? "lock.open.fill" : "lock.fill"
+                )
+            }
+            .help(model.lockInModeEnabled ? "End Lock In immediately" : "Protect the selected block's exact focus kit")
+
+            Button {
                 openWindow(id: "workspace-hub")
                 NSApp.activate(ignoringOtherApps: true)
             } label: {
@@ -237,6 +247,14 @@ struct DashboardView: View {
                 Toggle("TopBuddy notch", isOn: $model.floatingPetEnabled)
                 Toggle("Auto-open resources", isOn: $model.autoOpenResources)
                 Toggle("Auto-hide distractions", isOn: $model.autoHideDistractions)
+
+                Button(model.lockInModeEnabled ? "Show Lock In browser" : "Start Lock In") {
+                    if model.lockInModeEnabled {
+                        model.showLockInWindow()
+                    } else {
+                        model.toggleLockInMode(for: selectedBlock)
+                    }
+                }
 
                 Divider()
 

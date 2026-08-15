@@ -14,6 +14,7 @@ Include the affected version, macOS version, a minimal reproduction, expected be
 
 - TopBuddy is not a credential manager.
 - Only HTTPS, loopback HTTP, and validated app bundle identifiers are opened from schedules.
+- Lock In is intentionally escapable and app-level: it constrains its own WebKit browser and hides unlisted regular apps, but does not install network filters, Accessibility hooks, or a system extension.
 - Codex runs only after a user message, ephemerally and read-only.
 - Apple Music uses a fixed command set; raw AppleScript is not accepted.
 - App termination is graceful and confirmation-gated.

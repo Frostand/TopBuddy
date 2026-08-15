@@ -86,6 +86,15 @@ struct CurrentBlockCard: View {
                 }
                 .controlSize(.large)
 
+                Button(
+                    model.lockInModeEnabled ? "End Lock In" : "Lock In",
+                    systemImage: model.lockInModeEnabled ? "lock.open.fill" : "lock.fill"
+                ) {
+                    model.toggleLockInMode(for: block)
+                }
+                .controlSize(.large)
+                .tint(model.lockInModeEnabled ? .red : .orange)
+
                 Spacer()
 
                 Button(
@@ -119,15 +128,34 @@ struct CurrentBlockCard: View {
                     HStack(spacing: 8) {
                         ForEach(block.resources) { resource in
                             Button {
-                                model.workspace.open([resource])
+                                model.open(resource, for: block)
                             } label: {
-                                Label(resource.label, systemImage: resource.kind == .url ? "link" : "app")
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Label(resource.label, systemImage: resource.kind == .url ? "link" : "app")
+                                    Text(resource.openAtStart ? "Opens at start" : "Allowed on demand")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                         }
                     }
                 }
+            }
+
+            if !block.materials.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Books & materials")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(block.materials) { material in
+                        Label("\(material.label) — \(material.detail)", systemImage: material.kind.systemImage)
+                            .font(.callout)
+                            .textSelection(.enabled)
+                    }
+                }
+                .padding(.top, 3)
             }
         }
     }

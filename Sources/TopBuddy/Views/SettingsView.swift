@@ -25,6 +25,10 @@ struct SettingsView: View {
                 Toggle("Show TopBuddy in the notch", isOn: $model.floatingPetEnabled)
                 Toggle("Automatically open block resources", isOn: $model.autoOpenResources)
                 Toggle("Hide unrelated apps at block changes", isOn: $model.autoHideDistractions)
+                Toggle("Lock In mode", isOn: lockInBinding)
+                Text("Lock In uses each block's exact focus kit, opens approved sites inside a constrained browser, and hides off-topic apps. It never force-quits apps and always provides an immediate exit.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Toggle("Show manual app-quit review tools", isOn: $model.quitReviewEnabled)
             }
 
@@ -51,6 +55,16 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    private var lockInBinding: Binding<Bool> {
+        Binding(
+            get: { model.lockInModeEnabled },
+            set: { enabled in
+                guard enabled != model.lockInModeEnabled else { return }
+                model.toggleLockInMode()
+            }
+        )
     }
 
     private var permissionSettings: some View {

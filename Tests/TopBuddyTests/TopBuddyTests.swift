@@ -159,6 +159,25 @@ final class TopBuddyTests: XCTestCase {
     }
 
     @MainActor
+    func testHandoffRejectsUnsupportedFutureSchema() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TopBuddySchemaTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ScheduleHandoffStore(directoryURL: directory)
+        let document = DailyScheduleDocument(
+            schemaVersion: 99,
+            date: "2030-01-02",
+            refreshedAt: "2030-01-02T15:00:00Z",
+            source: "Local test",
+            blocks: [block(id: "work", title: "Work", start: 12 * 60, end: 13 * 60, category: .routine)]
+        )
+
+        XCTAssertThrowsError(try store.write(document)) { error in
+            XCTAssertEqual(error as? ScheduleImportError, .unsupportedSchema(99))
+        }
+    }
+
+    @MainActor
     func testCompletionPersistsLocallyForImportedBlock() throws {
         let suiteName = "TopBuddyTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -372,6 +391,234 @@ final class TopBuddyTests: XCTestCase {
         XCTAssertFalse(calendar.isEnabled)
         XCTAssertFalse(defaults.bool(forKey: "topbuddy.music.controls-enabled"))
         XCTAssertFalse(defaults.bool(forKey: "topbuddy.calendar.enabled"))
+    }
+
+    func testLegacyHandoffDefaultsResourcesToOpenAndMaterialsToEmpty() throws {
+        let data = Data(
+            """
+            {
+              "id": "legacy",
+              "title": "Legacy study",
+              "startMinute": 600,
+              "endMinute": 660,
+              "category": "competition",
+              "exactActions": "Study the assigned topic.",
+              "finishTarget": "One saved artifact.",
+              "resources": [
+                {"kind": "url", "label": "Guide", "value": "https://example.com/guide"}
+              ],
+              "competition": "Example"
+            }
+            """.utf8
+        )
+
+        let decoded = try JSONDecoder().decode(ScheduleBlock.self, from: data)
+
+        XCTAssertTrue(try XCTUnwrap(decoded.resources.first).openAtStart)
+        XCTAssertTrue(decoded.materials.isEmpty)
+    }
+
+    func testLockInPolicyAllowsOnlyAssignedAppsAndDomains() {
+        let protectedBlock = ScheduleBlock(
+            id: "focus",
+            title: "Focused work",
+            startMinute: 600,
+            endMinute: 660,
+            category: .competition,
+            exactActions: "Use the assigned guide.",
+            finishTarget: "One saved artifact.",
+            resources: [
+                .url("Guide", "https://docs.example.com/path", openAtStart: false),
+                .application("Editor", bundleIdentifier: "com.example.Editor")
+            ],
+            materials: [.init(kind: .book, label: "Textbook", detail: "Chapter 2")],
+            competition: Competition(rawValue: "Example")
+        )
+        let policy = LockInPolicy(block: protectedBlock)
+
+        XCTAssertTrue(policy.allows(url: URL(string: "https://docs.example.com/other")!))
+        XCTAssertTrue(policy.allows(url: URL(string: "https://login.docs.example.com/start")!))
+        XCTAssertFalse(policy.allows(url: URL(string: "https://example.com/")!))
+        XCTAssertFalse(policy.allows(url: URL(string: "https://notdocs.example.com/")!))
+        XCTAssertTrue(policy.allows(bundleIdentifier: "com.example.Editor"))
+        XCTAssertFalse(policy.allows(bundleIdentifier: "com.example.Game"))
+    }
+
+    func testLockInReasonRequiresSpecificBoundedExplanation() throws {
+        XCTAssertThrowsError(
+            try LockInReasonValidator.validate("I need a break", durationMinutes: 10)
+        ) { error in
+            XCTAssertEqual(error as? LockInReasonError, .tooVague)
+        }
+        XCTAssertThrowsError(
+            try LockInReasonValidator.validate(
+                "I need the API documentation to verify today's exact request format.",
+                durationMinutes: 60
+            )
+        ) { error in
+            XCTAssertEqual(error as? LockInReasonError, .invalidDuration)
+        }
+        XCTAssertEqual(
+            try LockInReasonValidator.validate(
+                "I need the API documentation to verify today's exact request format.",
+                durationMinutes: 10
+            ),
+            "I need the API documentation to verify today's exact request format."
+        )
+    }
+
+    @MainActor
+    func testLockInGrantIsTemporaryAndPreservesBlockedWebsiteURL() throws {
+        let store = LockInStore()
+        let protectedBlock = ScheduleBlock(
+            id: "focus",
+            title: "Focused work",
+            startMinute: 600,
+            endMinute: 660,
+            category: .competition,
+            exactActions: "Use the assigned guide.",
+            finishTarget: "One saved artifact.",
+            resources: [.url("Guide", "https://docs.example.com/path")],
+            competition: Competition(rawValue: "Example")
+        )
+        let start = Date(timeIntervalSince1970: 1_000)
+        let blockedURL = URL(string: "https://reference.example.net/needed/path?q=1")!
+        store.configure(for: protectedBlock)
+
+        XCTAssertFalse(store.allows(url: blockedURL, at: start))
+        XCTAssertTrue(store.registerBlockedWebsite(url: blockedURL, at: start))
+        let attempt = try store.grantPending(
+            reason: "I need this reference to verify the assigned implementation detail.",
+            durationMinutes: 5,
+            at: start
+        )
+
+        XCTAssertEqual(attempt.value, blockedURL.absoluteString)
+        XCTAssertTrue(store.allows(url: blockedURL, at: start.addingTimeInterval(299)))
+        XCTAssertFalse(store.allows(url: blockedURL, at: start.addingTimeInterval(301)))
+    }
+
+    @MainActor
+    func testLockInFocusKitChangeRevokesExistingException() throws {
+        let store = LockInStore()
+        let firstBlock = ScheduleBlock(
+            id: "focus",
+            title: "Focused work",
+            startMinute: 600,
+            endMinute: 660,
+            category: .competition,
+            exactActions: "Use the assigned guide.",
+            finishTarget: "One saved artifact.",
+            resources: [.url("Guide", "https://docs.example.com/path")],
+            competition: Competition(rawValue: "Example")
+        )
+        let revisedBlock = firstBlock.replacingResources([
+            .url("Revised guide", "https://revised.example.com/path")
+        ])
+        let blockedURL = URL(string: "https://temporary.example.net/reference")!
+        let start = Date(timeIntervalSince1970: 1_000)
+        store.configure(for: firstBlock)
+        XCTAssertTrue(store.registerBlockedWebsite(url: blockedURL, at: start))
+        _ = try store.grantPending(
+            reason: "I need this reference to verify the assigned implementation detail.",
+            durationMinutes: 10,
+            at: start
+        )
+        XCTAssertTrue(store.allows(url: blockedURL, at: start))
+
+        store.configure(for: revisedBlock)
+
+        XCTAssertFalse(store.allows(url: blockedURL, at: start))
+        XCTAssertTrue(store.grants.isEmpty)
+    }
+
+    @MainActor
+    func testFocusBrowserDoesNotAutoOpenAllowedOnDemandResource() throws {
+        let lockIn = LockInStore()
+        let browser = FocusBrowserStore(lockIn: lockIn)
+        let protectedBlock = ScheduleBlock(
+            id: "focus",
+            title: "Focused work",
+            startMinute: 600,
+            endMinute: 660,
+            category: .competition,
+            exactActions: "Use the assigned guide.",
+            finishTarget: "One saved artifact.",
+            resources: [.url("Guide", "https://docs.example.com/path", openAtStart: false)],
+            competition: Competition(rawValue: "Example")
+        )
+
+        browser.configure(for: protectedBlock)
+
+        guard case let .load(initialURL) = try XCTUnwrap(browser.command).action else {
+            return XCTFail("Expected the prior page to be cleared")
+        }
+        XCTAssertEqual(initialURL.absoluteString, "about:blank")
+        browser.requestLoad(try XCTUnwrap(protectedBlock.resources.first))
+        guard case let .load(url) = try XCTUnwrap(browser.command).action else {
+            return XCTFail("Expected an explicit allowed load command")
+        }
+        XCTAssertEqual(url.absoluteString, "https://docs.example.com/path")
+    }
+
+    @MainActor
+    func testFocusBrowserBlanksExpiredTemporaryWebsite() throws {
+        let lockIn = LockInStore()
+        let browser = FocusBrowserStore(lockIn: lockIn)
+        let protectedBlock = ScheduleBlock(
+            id: "focus",
+            title: "Focused work",
+            startMinute: 600,
+            endMinute: 660,
+            category: .competition,
+            exactActions: "Use the assigned guide.",
+            finishTarget: "One saved artifact.",
+            resources: [.url("Guide", "https://docs.example.com/path")],
+            competition: Competition(rawValue: "Example")
+        )
+        let start = Date(timeIntervalSince1970: 5_000)
+        let temporaryURL = URL(string: "https://temporary.example.net/reference")!
+        browser.configure(for: protectedBlock)
+        XCTAssertTrue(lockIn.registerBlockedWebsite(url: temporaryURL, at: start))
+        let attempt = try lockIn.grantPending(
+            reason: "I need this temporary reference to verify the assigned implementation detail.",
+            durationMinutes: 5,
+            at: start
+        )
+        browser.resumeAfterGrant(attempt)
+        browser.update(
+            url: temporaryURL,
+            title: "Temporary",
+            canGoBack: true,
+            canGoForward: false,
+            isLoading: false
+        )
+
+        browser.enforceCurrentAccess(at: start.addingTimeInterval(301))
+
+        XCTAssertEqual(browser.currentURL.absoluteString, "about:blank")
+        XCTAssertTrue(browser.errorMessage?.contains("expired") == true)
+    }
+
+    func testScheduleValidationRejectsIncompleteMaterial() {
+        let invalid = ScheduleBlock(
+            id: "focus",
+            title: "Focused work",
+            startMinute: 600,
+            endMinute: 660,
+            category: .competition,
+            exactActions: "Use the assigned guide.",
+            finishTarget: "One saved artifact.",
+            resources: [],
+            materials: [.init(kind: .book, label: "Textbook", detail: "")],
+            competition: Competition(rawValue: "Example")
+        )
+
+        XCTAssertThrowsError(try ScheduleValidator.validate([invalid])) { error in
+            guard case ScheduleImportError.invalidMaterial("Textbook") = error else {
+                return XCTFail("Expected invalid material, received \(error)")
+            }
+        }
     }
 
     private func block(

@@ -9,6 +9,7 @@ struct SetupExperienceView: View {
     @State private var showNotch = true
     @State private var autoOpenResources = false
     @State private var autoHideDistractions = false
+    @State private var lockInModeEnabled = false
     @State private var quitReviewEnabled = true
     @State private var notionEnabled = false
     @State private var codexEnabled = false
@@ -89,7 +90,7 @@ struct SetupExperienceView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 235), spacing: 14)], alignment: .leading, spacing: 14) {
                 promise("No bundled personal data", "The public app starts with no schedule, accounts, workspace links, or example history.", "person.crop.circle.badge.xmark")
                 promise("No telemetry", "TopBuddy has no analytics SDK, ad tracker, or remote account of its own.", "waveform.path.ecg.rectangle")
-                promise("No surprise automation", "Automatic opening, hiding, Music, Calendar, and Codex all begin disabled.", "hand.raised.fill")
+                promise("No surprise automation", "Automatic opening, hiding, Lock In, Music, Calendar, and Codex all begin disabled.", "hand.raised.fill")
             }
 
             Label("You can revisit every choice in Settings. Quitting another app always requires a fresh review and uses the app's normal quit request.", systemImage: "lock.shield.fill")
@@ -135,6 +136,10 @@ struct SetupExperienceView: View {
                     Toggle("Show TopBuddy in the notch", isOn: $showNotch)
                     Toggle("Open block resources automatically", isOn: $autoOpenResources)
                     Toggle("Hide unrelated apps at block changes", isOn: $autoHideDistractions)
+                    Toggle("Keep Lock In active across schedule blocks", isOn: $lockInModeEnabled)
+                    Text("Lock In uses the current block's exact focus kit, hides unlisted regular apps, and keeps websites inside a constrained browser. You can end it immediately.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     Toggle("Show manual app-quit review tools", isOn: $quitReviewEnabled)
                 }
                 Section("Boundary") {
@@ -330,6 +335,7 @@ struct SetupExperienceView: View {
                 showNotch: showNotch,
                 autoOpenResources: autoOpenResources,
                 autoHideDistractions: autoHideDistractions,
+                lockInModeEnabled: lockInModeEnabled,
                 quitReviewEnabled: quitReviewEnabled,
                 notionWorkspaceEnabled: notionEnabled,
                 codexCoachEnabled: codexEnabled,

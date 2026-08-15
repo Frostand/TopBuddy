@@ -47,6 +47,25 @@ mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$RELEASE_DIR"
 cp "$APP_BINARY" "$APP_MACOS/$APP_NAME"
 cp "$INFO_PLIST" "$APP_CONTENTS/Info.plist"
 chmod +x "$APP_MACOS/$APP_NAME"
+/usr/bin/strip -S "$APP_MACOS/$APP_NAME"
+
+scan_binary() {
+  local label="$1"
+  local pattern="$2"
+  local matches
+
+  matches="$(/usr/bin/strings "$APP_MACOS/$APP_NAME" | rg -n --pcre2 -- "$pattern" || true)"
+  if [[ -n "$matches" ]]; then
+    echo "packaged-binary privacy audit failed: $label" >&2
+    echo "$matches" >&2
+    exit 1
+  fi
+}
+
+scan_binary "absolute macOS home path" '/''Users/[^/[:space:]"'\''`]+'
+scan_binary "email address" '(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.(?:com|org|net|edu|gov|io|dev|app|co)\b'
+scan_binary "private workspace URL" '(?i)https?://(?:app\.notion\.com/(?:p/)?[0-9a-f]{20,}|[a-z0-9-]+\.chatgpt\.site)'
+scan_binary "credential-like token" '(?:github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16})'
 
 if [[ -n "${TOPBUDDY_SIGNING_IDENTITY:-}" ]]; then
   /usr/bin/codesign \
