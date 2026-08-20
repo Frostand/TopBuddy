@@ -49,8 +49,12 @@ struct NotchAgendaPageView: View {
                     .foregroundStyle(.purple)
                 Spacer()
                 if calendarAgenda.canRead {
-                    Button { calendarAgenda.refresh() } label: { Image(systemName: "arrow.clockwise") }
-                        .buttonStyle(.plain)
+                    Button { calendarAgenda.refresh() } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(TopBuddyNotchIconButtonStyle(size: TopBuddyNotchDesign.denseHitTarget))
+                    .help("Refresh Calendar")
+                    .accessibilityLabel("Refresh Calendar")
                 }
             }
 
@@ -82,7 +86,7 @@ struct NotchAgendaPageView: View {
                     .foregroundStyle(.secondary)
                 Button("Enable Calendar") { Task { await calendarAgenda.requestAccess() } }
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+                    .controlSize(.regular)
             }
         }
         .notchAgendaCard()

@@ -16,9 +16,9 @@ final class LockInBrowserWindowController: NSWindowController {
             onGranted: onGranted
         )
         let window = NSWindow(contentViewController: NSHostingController(rootView: content))
-        window.title = "TopBuddy Lock In"
-        window.setContentSize(NSSize(width: 1_060, height: 720))
-        window.minSize = NSSize(width: 860, height: 620)
+        window.title = "TopBuddy Lock In controls"
+        window.setContentSize(NSSize(width: 820, height: 600))
+        window.minSize = NSSize(width: 680, height: 480)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.isReleasedWhenClosed = false
         window.center()

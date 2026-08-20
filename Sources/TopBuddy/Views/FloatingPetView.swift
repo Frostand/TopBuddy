@@ -21,21 +21,20 @@ struct TopBuddyNotchView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background {
             TopBuddyNotchShape(expanded: presentation.isExpanded)
-                .fill(Color.black)
+                .fill(TopBuddyNotchDesign.shellColor)
                 .shadow(
-                    color: presentation.isExpanded ? schedule.petState.accent.opacity(0.28) : .clear,
-                    radius: 18,
-                    y: 7
+                    color: presentation.isExpanded ? Color.black.opacity(0.46) : .clear,
+                    radius: 20,
+                    y: 12
                 )
-        }
-        .overlay {
-            TopBuddyNotchShape(expanded: presentation.isExpanded)
-                .stroke(Color.white.opacity(presentation.isExpanded ? 0.14 : 0.055), lineWidth: 1)
         }
         .clipShape(TopBuddyNotchShape(expanded: presentation.isExpanded))
         .contentShape(TopBuddyNotchShape(expanded: presentation.isExpanded))
         .preferredColorScheme(.dark)
-        .animation(reduceMotion ? nil : .snappy(duration: 0.27), value: presentation.isExpanded)
+        .animation(
+            reduceMotion ? nil : .snappy(duration: presentation.timing.contentAnimationDuration),
+            value: presentation.isExpanded
+        )
         .onTapGesture {
             if !presentation.isExpanded {
                 presentation.expand(
@@ -110,7 +109,7 @@ struct TopBuddyNotchView: View {
     private var expandedView: some View {
         VStack(spacing: 0) {
             notchHeader
-                .frame(height: max(42, presentation.geometry.physicalNotchHeight + 8))
+                .frame(height: max(52, presentation.geometry.physicalNotchHeight + 14))
 
             pageBar
                 .padding(.horizontal, 18)
@@ -150,21 +149,21 @@ struct TopBuddyNotchView: View {
                 presentation.togglePin()
             } label: {
                 Image(systemName: presentation.isPinned ? "pin.fill" : "pin")
-                    .frame(width: 24, height: 24)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TopBuddyNotchIconButtonStyle())
             .foregroundStyle(presentation.isPinned ? .cyan : .white.opacity(0.68))
             .help(presentation.isPinned ? "Unpin from notch" : "Keep TopBuddy open")
+            .accessibilityLabel(presentation.isPinned ? "Unpin TopBuddy" : "Pin TopBuddy")
 
             Button {
                 presentation.collapse()
             } label: {
                 Image(systemName: "chevron.up")
-                    .frame(width: 24, height: 24)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TopBuddyNotchIconButtonStyle())
             .foregroundStyle(.white.opacity(0.68))
             .help("Collapse into the notch")
+            .accessibilityLabel("Collapse TopBuddy")
         }
         .padding(.horizontal, 16)
     }
@@ -179,8 +178,8 @@ struct TopBuddyNotchView: View {
                         .font(.caption.weight(.semibold))
                         .labelStyle(.titleAndIcon)
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .frame(maxWidth: .infinity)
+                        .frame(maxWidth: .infinity, minHeight: TopBuddyNotchDesign.minimumHitTarget)
+                        .contentShape(Capsule())
                         .background(
                             presentation.selectedPage == page ? Color.white.opacity(0.14) : .clear,
                             in: Capsule()

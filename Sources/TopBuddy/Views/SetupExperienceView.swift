@@ -137,7 +137,7 @@ struct SetupExperienceView: View {
                     Toggle("Open block resources automatically", isOn: $autoOpenResources)
                     Toggle("Hide unrelated apps at block changes", isOn: $autoHideDistractions)
                     Toggle("Keep Lock In active across schedule blocks", isOn: $lockInModeEnabled)
-                    Text("Lock In uses the current block's exact focus kit, hides unlisted regular apps, and keeps websites inside a constrained browser. You can end it immediately.")
+                    Text("Lock In uses the current block's exact focus kit, opens assigned websites in your macOS default browser, and hides unlisted regular apps. TopBuddy cannot inspect or block manual browser navigation without an extension. You can end it immediately.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Toggle("Show manual app-quit review tools", isOn: $quitReviewEnabled)

@@ -2,7 +2,6 @@ import Foundation
 
 enum ScheduleResourceCatalog {
     static let notion = ResourceTarget.url("Notion", "https://www.notion.so/")
-    static let browser = ResourceTarget.application("Safari", bundleIdentifier: "com.apple.Safari")
     static let terminal = ResourceTarget.application("Terminal", bundleIdentifier: "com.apple.Terminal")
     static let xcode = ResourceTarget.application("Xcode", bundleIdentifier: "com.apple.dt.Xcode")
     static let vscode = ResourceTarget.application("Visual Studio Code", bundleIdentifier: "com.microsoft.VSCode")
@@ -10,7 +9,7 @@ enum ScheduleResourceCatalog {
     static let zoom = ResourceTarget.application("Zoom", bundleIdentifier: "us.zoom.xos")
 
     static let templates: [ResourceTarget] = [
-        notion, browser, terminal, xcode, vscode, slack, zoom
+        notion, terminal, xcode, vscode, slack, zoom
     ]
 
     static func inferredResources(for title: String) -> [ResourceTarget] {

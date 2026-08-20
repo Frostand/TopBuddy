@@ -8,7 +8,10 @@ struct LockInPolicy: Equatable, Sendable {
     let resources: [ResourceTarget]
     let materials: [StudyMaterial]
 
-    init(block: ScheduleBlock) {
+    init(
+        block: ScheduleBlock,
+        additionalAllowedBundleIdentifiers: Set<String> = []
+    ) {
         blockID = block.id
         blockTitle = block.title
         resources = block.resources
@@ -17,7 +20,7 @@ struct LockInPolicy: Equatable, Sendable {
             block.resources
                 .filter { $0.kind == .application }
                 .map(\.value)
-        )
+        ).union(additionalAllowedBundleIdentifiers)
         allowedHosts = Set(
             block.resources
                 .filter { $0.kind == .url }

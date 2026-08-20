@@ -263,7 +263,7 @@ struct ResourceRulesView: View {
 
     private var footer: some View {
         HStack {
-            Text("Lock In hides unlisted apps and keeps unlisted sites out of its browser. It never force-quits anything.")
+            Text("Lock In hides unlisted apps and only opens assigned links in your macOS default browser. It cannot inspect or block manual navigation there without an extension, and it never force-quits anything.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()

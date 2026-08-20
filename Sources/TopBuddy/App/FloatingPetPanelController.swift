@@ -19,16 +19,18 @@ final class TopBuddyNotchPanelController {
     private let model: AppModel
     private let panel: TopBuddyNotchPanel
     private let presentation: NotchPresentationStore
+    private let timing: NotchInteractionTiming
     private var pointerTimer: Timer?
     private var exitDeadline: Date?
     private var screenObserver: NSObjectProtocol?
 
     var isVisible: Bool { panel.isVisible }
 
-    init(model: AppModel) {
+    init(model: AppModel, timing: NotchInteractionTiming = .responsive) {
         self.model = model
+        self.timing = timing
         let geometry = Self.geometry(for: Self.targetScreen())
-        presentation = NotchPresentationStore(geometry: geometry)
+        presentation = NotchPresentationStore(geometry: geometry, timing: timing)
         panel = TopBuddyNotchPanel(
             contentRect: geometry.windowFrame(expanded: false),
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView, .utilityWindow],
@@ -89,10 +91,13 @@ final class TopBuddyNotchPanelController {
 
     private func startPointerTracking() {
         guard pointerTimer == nil else { return }
-        pointerTimer = Timer.scheduledTimer(withTimeInterval: 0.075, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: timing.pointerSamplingInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.samplePointer() }
         }
-        pointerTimer?.tolerance = 0.02
+        timer.tolerance = 0
+        pointerTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+        samplePointer()
     }
 
     private func samplePointer(now: Date = Date()) {
@@ -110,14 +115,14 @@ final class TopBuddyNotchPanelController {
             return
         }
 
-        let interactiveFrame = panel.frame.insetBy(dx: -12, dy: -8)
+        let interactiveFrame = panel.frame.insetBy(dx: -18, dy: -12)
         if interactiveFrame.contains(point) || presentation.isPinned || panel.isKeyWindow {
             exitDeadline = nil
             return
         }
 
         if exitDeadline == nil {
-            exitDeadline = now.addingTimeInterval(0.55)
+            exitDeadline = now.addingTimeInterval(timing.exitGraceDuration)
         } else if let exitDeadline, now >= exitDeadline {
             self.exitDeadline = nil
             presentation.collapse()
@@ -141,7 +146,7 @@ final class TopBuddyNotchPanelController {
         }
 
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.28
+            context.duration = timing.frameAnimationDuration
             context.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.82, 0.2, 1)
             panel.animator().setFrame(targetFrame, display: true)
         }

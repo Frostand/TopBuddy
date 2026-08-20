@@ -12,10 +12,14 @@ struct FocusBrowserCommand: Identifiable, Equatable {
     let action: Action
 }
 
+/// Lock In's small controls model for opening assigned resources in the
+/// browser macOS currently uses. It intentionally has no tab, history, cookie,
+/// or embedded-WebKit state. The legacy navigation fields remain as inert
+/// compatibility state for older local UI code and are not a browser surface.
 @MainActor
 final class FocusBrowserStore: ObservableObject {
     @Published var addressText = ""
-    @Published private(set) var pageTitle = "Lock In Browser"
+    @Published private(set) var pageTitle = "Lock In controls"
     @Published private(set) var currentURL = URL(string: "about:blank")!
     @Published private(set) var canGoBack = false
     @Published private(set) var canGoForward = false
@@ -28,26 +32,43 @@ final class FocusBrowserStore: ObservableObject {
     @Published var errorMessage: String?
 
     let lockIn: LockInStore
+    let defaultBrowserRouter: any DefaultBrowserRouting
 
-    init(lockIn: LockInStore) {
-        self.lockIn = lockIn
+    var defaultBrowserName: String {
+        defaultBrowserRouter.currentBrowser.name
     }
 
-    func configure(for block: ScheduleBlock) {
+    init(
+        lockIn: LockInStore,
+        defaultBrowserRouter: any DefaultBrowserRouting = SystemDefaultBrowserRouter()
+    ) {
+        self.lockIn = lockIn
+        self.defaultBrowserRouter = defaultBrowserRouter
+    }
+
+    func configure(for block: ScheduleBlock, preserveLockInPolicy: Bool = false) {
         blockTitle = block.title
         webResources = block.resources.filter { $0.kind == .url }
         materials = block.materials
-        lockIn.configure(for: block)
-        resetToBlank()
-        if let first = webResources.first(where: \.openAtStart),
-           let url = URL(string: first.value) {
-            requestLoad(url)
+        if !preserveLockInPolicy {
+            lockIn.configure(for: block)
         }
+        resetToBlank()
     }
 
-    func goBack() { command = FocusBrowserCommand(action: .goBack) }
-    func goForward() { command = FocusBrowserCommand(action: .goForward) }
-    func reload() { command = FocusBrowserCommand(action: .reload) }
+    // These controls are retained for source compatibility with older views;
+    // navigation is always delegated to the external default browser.
+    func goBack() {
+        errorMessage = "Use the back button in \(defaultBrowserName)."
+    }
+
+    func goForward() {
+        errorMessage = "Use the forward button in \(defaultBrowserName)."
+    }
+
+    func reload() {
+        errorMessage = "Reload this page in \(defaultBrowserName)."
+    }
 
     func loadAddress() {
         let trimmed = addressText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -63,9 +84,10 @@ final class FocusBrowserStore: ObservableObject {
         requestLoad(url)
     }
 
+    /// Opens an approved URL in macOS's current default browser.
     func requestLoad(_ url: URL) {
         guard isSafe(url) else {
-            errorMessage = "Lock In Browser accepts HTTPS and localhost URLs only."
+            errorMessage = "Lock In accepts HTTPS and localhost URLs only."
             return
         }
         guard lockIn.allows(url: url) else {
@@ -75,9 +97,21 @@ final class FocusBrowserStore: ObservableObject {
         }
         errorMessage = nil
         addressText = url.absoluteString
+        currentURL = url
         command = FocusBrowserCommand(action: .load(url))
+        _ = defaultBrowserRouter.open(url)
     }
 
+    func openAddress() {
+        loadAddress()
+    }
+
+    func openResource(_ resource: ResourceTarget) {
+        requestLoad(resource)
+    }
+
+    /// Kept for the old WebKit coordinator. It is not used by the Lock In
+    /// controls window because TopBuddy no longer embeds a browser.
     func allowsNavigation(to url: URL) -> Bool {
         if url.absoluteString == "about:blank" { return true }
         guard isSafe(url), lockIn.allows(url: url) else {
@@ -96,11 +130,13 @@ final class FocusBrowserStore: ObservableObject {
         requestLoad(pendingURL)
     }
 
+    /// External browsers cannot be inspected by TopBuddy. This method only
+    /// preserves compatibility for old callers and does not inspect a tab.
     func enforceCurrentAccess(at date: Date = Date()) {
         guard currentURL.absoluteString != "about:blank",
               !lockIn.allows(url: currentURL, at: date) else { return }
         resetToBlank()
-        errorMessage = "Temporary website access expired. The protected browser returned to a blank page."
+        errorMessage = "Temporary website access expired. Open it again after requesting a new exception."
     }
 
     func update(
@@ -147,10 +183,11 @@ final class FocusBrowserStore: ObservableObject {
         let blank = URL(string: "about:blank")!
         currentURL = blank
         addressText = ""
-        pageTitle = "Lock In Browser"
+        pageTitle = "Lock In controls"
         canGoBack = false
         canGoForward = false
         isLoading = false
+        estimatedProgress = 0
         errorMessage = nil
         command = FocusBrowserCommand(action: .load(blank))
     }

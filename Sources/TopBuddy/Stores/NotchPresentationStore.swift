@@ -12,11 +12,13 @@ final class NotchPresentationStore: ObservableObject {
     @Published private(set) var isPinned = false
     @Published var selectedPage: TopBuddyNotchPage = .buddy
     @Published private(set) var geometry: NotchDisplayGeometry
+    let timing: NotchInteractionTiming
 
     var onPresentationChanged: (() -> Void)?
 
-    init(geometry: NotchDisplayGeometry) {
+    init(geometry: NotchDisplayGeometry, timing: NotchInteractionTiming = .responsive) {
         self.geometry = geometry
+        self.timing = timing
     }
 
     func expand(reason: OpenReason, page: TopBuddyNotchPage? = nil) {

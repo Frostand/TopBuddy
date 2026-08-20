@@ -10,7 +10,17 @@ final class LockInStore: ObservableObject {
     var isActive: Bool { activePolicy != nil }
 
     func configure(for block: ScheduleBlock) {
-        let policy = LockInPolicy(block: block)
+        configure(for: block, additionalAllowedBundleIdentifiers: [])
+    }
+
+    func configure(
+        for block: ScheduleBlock,
+        additionalAllowedBundleIdentifiers: Set<String>
+    ) {
+        let policy = LockInPolicy(
+            block: block,
+            additionalAllowedBundleIdentifiers: additionalAllowedBundleIdentifiers
+        )
         if activePolicy != policy {
             grants = []
             pendingAttempt = nil

@@ -78,8 +78,9 @@ TopBuddy watches `~/Library/Application Support/TopBuddy/today.json`. The app ac
 
 ## Lock In focus-kit rules
 
-- Every website the block may need must appear explicitly. Include a separate `openAtStart: false` resource for required login, documentation, or related domains instead of relying on an unbounded browser.
-- TopBuddy allows top-level navigation to the listed host and its subdomains inside the Lock In browser. A listed page can still load its own third-party subresources, so prefer the narrowest trustworthy official host that can complete the task.
+- Every website the block may need must appear explicitly. Include a separate `openAtStart: false` resource for required login, documentation, or related domains instead of relying on an unbounded opening rule.
+- When TopBuddy opens an approved URL, it validates the resource and hands it to macOS's current default browser. TopBuddy does not inspect or block later manual navigation, tabs, cookies, logins, or page content in that external browser; Lock In is an assistive app boundary, not browser enforcement.
+- A listed page can still load its own third-party subresources, so prefer the narrowest trustworthy official host that can complete the task.
 - Every app the block may need must have its exact installed bundle identifier. Do not guess bundle IDs.
 - A schedule generator should put a readable `Use:` clause in `exactActions` and encode the same sites/apps in `resources` and the same books/files/equipment in `materials`.
 - Lock In hides unlisted regular apps; it never force-quits them. The user can end Lock In immediately or grant a short in-memory exception with a specific reason.

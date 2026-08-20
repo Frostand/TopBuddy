@@ -28,7 +28,7 @@ Schedule, pet, shelf, and metadata files are written with owner-only permissions
 | Apple Music | User selects Enable or chooses it during setup | Fixed local Apple Events commands to the Music app | macOS Automation |
 | Apple Calendar | User selects Enable or chooses it during setup | No network data added by TopBuddy; event title/time/calendar are read into app memory | macOS Calendar read access |
 | Resource opening | User presses Start, or enables automatic opening | The Mac opens only validated HTTPS, HTTP-loopback, or installed-app resources | No broad automation permission |
-| Lock In browser | User enables Lock In and opens an approved site | Normal website traffic and WebKit session data can reach the selected site and third-party services embedded by that site; TopBuddy constrains top-level navigation, not webpage subresources | No macOS permission |
+| Lock In controls | User enables Lock In and opens an approved site | The URL is handed to macOS's current default browser. TopBuddy does not inspect that browser's tabs, history, cookies, logins, or page content. | No macOS prompt |
 
 TopBuddy never reads or copies Codex authentication files. It invokes the installed executable with `--ephemeral` and `--sandbox read-only` from a fresh owner-only empty temporary working directory, then removes that directory after the response.
 

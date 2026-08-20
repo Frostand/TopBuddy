@@ -10,11 +10,23 @@ The public build starts empty: no schedule, account, workspace link, pet downloa
 - First-run setup with Observe, Assist, and Focus control presets plus individual switches.
 - Four-column Markdown/TSV schedule import and private `today.json` handoff.
 - Per-block HTTPS, localhost, installed-app, book, file, and physical-material focus kits.
-- Optional Lock In mode with a constrained browser, app hiding, and short reason-gated exceptions.
+- Optional Lock In mode with external default-browser controls, app hiding, and short reason-gated exceptions.
 - Local completion state and explicit downstream rollover when a block needs more time.
 - Optional Notion WebKit workspace, read-only Apple Calendar agenda, and Apple Music playback controls.
 - Optional user-initiated Codex coaching through an installed CLI in an ephemeral read-only sandbox.
 - [Codex Pets](https://codex-pets.net/) gallery plus local PNG, JPEG, GIF, WebP, or compatible animated sprite-sheet import.
+
+## Architecture
+
+TopBuddy keeps the product boundary small and local-first:
+
+- SwiftUI views render setup, the dashboard, the notch pages, and optional integration screens. `AppModel` and focused stores own user-visible state.
+- AppKit owns the long-lived notch panel and the narrow workspace boundary for opening validated resources, hiding apps, and requesting graceful termination.
+- The schedule path is `ScheduleImportParser` → `ScheduleStore` → owner-only `today.json`/local completion state. Validation happens before an imported plan replaces the current one.
+- Optional Calendar, Music, Notion, pet-gallery, and Codex integrations live behind separate clients/stores. WebKit data and external service state do not enter schedule or pet storage.
+- Lock In derives an in-memory allowlist from the current block. Approved links are handed to macOS's current default browser; TopBuddy does not inspect that browser's tabs, cookies, history, or page content.
+
+The result is a single macOS executable with explicit permission gates rather than a background service or cloud backend. See [`AGENTS.md`](AGENTS.md) for the repository-level engineering boundaries and [`PRIVACY.md`](PRIVACY.md) for data-flow details.
 
 ## Control choices
 
@@ -28,9 +40,16 @@ Apple Music, Calendar, Notion, and Codex are separate opt-ins. Automatic focus c
 
 ## Lock In mode
 
-Lock In turns the current block's focus kit into an allowlist. Approved apps remain available, approved websites open inside TopBuddy's constrained browser, and unlisted regular apps are hidden when they come to the front. A blocked app or website can receive a 5, 10, 15, or 30 minute exception only after the user writes a task-specific reason.
+Lock In turns the current block's focus kit into an allowlist. Approved apps remain available, approved websites open in the Mac's current default browser, and unlisted regular apps are hidden when they come to the front. TopBuddy checks links it opens but cannot inspect or block manual navigation in the external browser without an extension. A blocked app or website can receive a 5, 10, 15, or 30 minute exception only after the user writes a task-specific reason.
 
 Lock In is a focus aid, not parental-control or security software. It does not force-quit apps, modify firewall rules, install a system extension, or make the Mac impossible to override. **End Lock In** is always available. Exception reasons and grants stay in memory and are cleared when Lock In ends or the schedule moves to a different block.
+
+## Known limitations
+
+- TopBuddy ships empty and has no planner sync; a user must paste a Markdown/TSV plan or provide a local handoff.
+- Lock In is intentionally escapable. It can hide unlisted apps and validate links that TopBuddy opens, but it cannot inspect or block manual navigation in an external browser without a browser extension.
+- Calendar, Music, Notion, Codex, and the pet gallery are optional integrations that require the relevant app, CLI, network, or macOS permission when the user chooses to enable them.
+- Public prereleases are ad-hoc signed and not notarized until a Developer ID signing identity is available.
 
 ## Requirements
 
@@ -40,16 +59,18 @@ Lock In is a focus aid, not parental-control or security software. It does not f
 
 ## Install the MVP
 
-The [`v0.2.0` GitHub prerelease](https://github.com/Frostand/TopBuddy/releases/tag/v0.2.0) contains a universal macOS app with Lock In focus kits. It is ad-hoc signed because the project does not yet have an Apple Developer ID certificate, so macOS may require the normal first-open confirmation. For the most transparent path, build from source:
+The [`v0.2.1` GitHub prerelease](https://github.com/Frostand/TopBuddy/releases/tag/v0.2.1) contains a universal macOS app with Lock In focus kits and a notch-matched, easier-to-click control surface. It is ad-hoc signed because the project does not yet have an Apple Developer ID certificate, so macOS may require the normal first-open confirmation. For the most transparent path, build from source:
 
 ```bash
 git clone https://github.com/Frostand/TopBuddy.git
 cd TopBuddy
-swift test
+swift test -Xswiftc -warnings-as-errors
 ./script/build_and_run.sh --verify
 ```
 
 The staged app is written to `dist/TopBuddy.app`.
+
+For a short, privacy-safe walkthrough using only generic schedule data, see [docs/demo-guide.md](docs/demo-guide.md). The repository intentionally contains no screenshots or captured user state.
 
 ## Import a schedule
 
@@ -76,7 +97,7 @@ swift build
 swift test -Xswiftc -warnings-as-errors
 ./script/privacy_audit.sh
 ./script/build_and_run.sh --verify
-./script/package_release.sh 0.2.0
+./script/package_release.sh 0.2.1
 ```
 
 `package_release.sh` creates a universal app zip and SHA-256 checksum. Set `TOPBUDDY_SIGNING_IDENTITY` and optionally `TOPBUDDY_NOTARY_PROFILE` to produce a Developer ID-signed and notarized package; otherwise it creates an honest ad-hoc-signed prerelease artifact.

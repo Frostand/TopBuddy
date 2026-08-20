@@ -43,7 +43,7 @@ struct MenuBarView: View {
                         model.toggleLockInMode(for: block)
                     }
                     if model.lockInModeEnabled {
-                        Button("Show Lock In browser", systemImage: "safari") {
+                        Button("Show Lock In controls", systemImage: "slider.horizontal.3") {
                             model.showLockInWindow()
                         }
                     }
